@@ -1,0 +1,66 @@
+:root {
+    --hl-bg-1: #f3f7f6;
+    --hl-bg-2: #eef3f1;
+    --hl-ink: #1d2528;
+    --hl-muted: #4e5d63;
+    --hl-stroke: rgba(18, 58, 70, 0.14);
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    font-family: "Manrope", "Segoe UI", sans-serif;
+    color: var(--hl-ink);
+    background:
+        radial-gradient(circle at 8% 8%, rgba(39, 121, 113, 0.14), transparent 32%),
+        radial-gradient(circle at 90% 12%, rgba(229, 122, 68, 0.12), transparent 30%),
+        linear-gradient(150deg, var(--hl-bg-1) 0%, var(--hl-bg-2) 100%);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+a {
+    color: #1d5f73;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.mud-paper {
+    border-radius: 12px;
+    border: 1px solid var(--hl-stroke);
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #2b9a61;
+}
+
+.invalid {
+    outline: 1px solid #b63e3e;
+}
+
+.validation-message {
+    color: #b63e3e;
+}
+
+#blazor-error-ui {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    padding: 0.85rem 1rem;
+    background: #932f2f;
+    color: #fff;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    margin-left: 0.6rem;
+}
