@@ -1,0 +1,87 @@
+@page "/models"
+@using HireLens.Web.Services
+@inject IDashboardReadService DashboardReadService
+@inject ISnackbar Snackbar
+
+<PageTitle>Models</PageTitle>
+
+<MudText Typo="Typo.h4">Model Registry</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Track model versions, accuracy snapshots, and active deployment status.
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudText Typo="Typo.h6">Saved Models</MudText>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">Refresh</MudButton>
+    </MudStack>
+
+    <MudDivider Class="my-3" />
+
+    <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading">
+        <HeaderContent>
+            <MudTh>Model Type</MudTh>
+            <MudTh>Version</MudTh>
+            <MudTh>Accuracy</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Trained</MudTh>
+            <MudTh>Path</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Model Type">@context.ModelType</MudTd>
+            <MudTd DataLabel="Version">@context.Version</MudTd>
+            <MudTd DataLabel="Accuracy">@context.Accuracy.ToString("P2")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip Variant="Variant.Outlined" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                    @(context.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Trained">@context.TrainedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+            <MudTd DataLabel="Path">
+                <MudTooltip Text="@context.StoragePath">
+                    <MudText Typo="Typo.caption">@Truncate(context.StoragePath, 32)</MudText>
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2">No model versions saved yet.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private List<ModelVersionRowDto> _rows = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _rows = (await DashboardReadService.GetModelVersionsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load model versions: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Truncate(string text, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length <= maxChars)
+        {
+            return text;
+        }
+
+        return $"{text[..maxChars]}...";
+    }
+}
