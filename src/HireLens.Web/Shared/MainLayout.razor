@@ -1,16 +1,19 @@
 @inherits LayoutComponentBase
 
 <MudThemeProvider Theme="@_theme" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
 
 <MudLayout Class="hl-shell">
     <MudAppBar Elevation="0" Dense="true" Class="hl-appbar">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h6">HireLens</MudText>
+        <MudAvatar Icon="@Icons.Material.Filled.Psychology" Color="Color.Primary" Variant="Variant.Filled" Class="mr-2 hl-brand-icon" />
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h6" Class="hl-brand-title">HireLens</MudText>
+            <MudText Typo="Typo.caption" Class="hl-brand-subtitle">Recruiting workspace</MudText>
+        </MudStack>
         <MudSpacer />
-        <MudChip Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">Backend + UI</MudChip>
+        <MudChip Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small" Class="hl-status-chip">
+            Preview
+        </MudChip>
     </MudAppBar>
 
     <MudDrawer Open="@_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1" Class="hl-drawer">
@@ -27,11 +30,11 @@
 
     private static readonly MudTheme _theme = new()
     {
-        PaletteLight = new PaletteLight
+        Palette = new Palette
         {
             Primary = "#0f766e",
             Secondary = "#d97706",
-            Tertiary = "#155e75",
+            Tertiary = "#2563eb",
             Background = "#f3f7f6",
             AppbarBackground = "#0f172a",
             AppbarText = "#f8fafc",
@@ -46,19 +49,9 @@
         },
         Typography = new Typography
         {
-            Default = new DefaultTypography
+            Default = new Default
             {
-                FontFamily = ["Manrope", "Segoe UI", "sans-serif"]
-            },
-            H4 = new H4Typography
-            {
-                FontFamily = ["Manrope", "Segoe UI", "sans-serif"],
-                FontWeight = 800
-            },
-            H5 = new H5Typography
-            {
-                FontFamily = ["Manrope", "Segoe UI", "sans-serif"],
-                FontWeight = 700
+                FontFamily = new[] { "Manrope", "Segoe UI", "sans-serif" }
             }
         }
     };

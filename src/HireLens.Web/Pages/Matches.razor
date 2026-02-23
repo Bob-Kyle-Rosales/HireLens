@@ -5,14 +5,26 @@
 
 <PageTitle>Matches</PageTitle>
 
-<MudText Typo="Typo.h4">Match Results</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">
-    Review ranked candidates per job and inspect the score explanation details.
-</MudText>
+<MudPaper Class="hl-page-hero mb-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.h4" Class="hl-page-title">Match Results</MudText>
+            <MudText Typo="Typo.body1" Class="hl-page-subtitle">
+                Review ranked candidates per role and inspect the scoring explanation.
+            </MudText>
+        </div>
+        <MudStack Row="true" Spacing="1">
+            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_rows.Count ranked rows</MudChip>
+            <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Info">
+                @(_selectedJobId is null ? "All jobs" : "Filtered")
+            </MudChip>
+        </MudStack>
+    </MudStack>
+</MudPaper>
 
 <MudGrid>
     <MudItem xs="12" lg="8">
-        <MudPaper Class="pa-4">
+        <MudPaper Class="pa-4 hl-panel">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
                 <MudSelect T="Guid?"
                            Label="Job Filter"
@@ -29,7 +41,7 @@
                 <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">Refresh</MudButton>
             </MudStack>
 
-            <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading">
+            <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading" Class="hl-data-table">
                 <HeaderContent>
                     <MudTh>Candidate</MudTh>
                     <MudTh>Job</MudTh>
@@ -50,7 +62,7 @@
                     </MudTd>
                     <MudTd DataLabel="Category">
                         <MudText Typo="Typo.caption">@context.PredictedCategory</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        <MudText Typo="Typo.caption" Class="hl-muted">
                             @FormatConfidence(context.ConfidenceScore)
                         </MudText>
                     </MudTd>
@@ -70,8 +82,8 @@
     </MudItem>
 
     <MudItem xs="12" lg="4">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6">Explanation</MudText>
+        <MudPaper Class="pa-4 hl-panel hl-explain-panel">
+            <MudText Typo="Typo.h6" Class="hl-panel-title">Explanation</MudText>
             <MudDivider Class="my-2" />
 
             @if (_selected is null)

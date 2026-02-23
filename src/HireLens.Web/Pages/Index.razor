@@ -5,10 +5,23 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudText Typo="Typo.h4">Hiring Dashboard</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">
-    Snapshot of pipeline activity, model analysis progress, and match output.
-</MudText>
+<MudPaper Class="hl-page-hero mb-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.h4" Class="hl-page-title">Hiring Dashboard</MudText>
+            <MudText Typo="Typo.body1" Class="hl-page-subtitle">
+                Snapshot of pipeline activity, resume analysis volume, and matching output.
+            </MudText>
+        </div>
+        @if (_summary is not null)
+        {
+            <MudStack Row="true" Spacing="1">
+                <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_summary.JobCount roles</MudChip>
+                <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Secondary">@_summary.CandidateCount candidates</MudChip>
+            </MudStack>
+        }
+    </MudStack>
+</MudPaper>
 
 @if (_loading)
 {
@@ -30,39 +43,43 @@ else
     <MudGrid>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4 hl-kpi">
+                <MudIcon Icon="@Icons.Material.Filled.WorkOutline" Color="Color.Primary" />
                 <MudText Typo="Typo.overline">Jobs</MudText>
-                <MudText Typo="Typo.h4">@_summary.JobCount</MudText>
+                <MudText Typo="Typo.h4" Class="hl-kpi-value">@_summary.JobCount</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4 hl-kpi">
+                <MudIcon Icon="@Icons.Material.Filled.PeopleOutline" Color="Color.Primary" />
                 <MudText Typo="Typo.overline">Candidates</MudText>
-                <MudText Typo="Typo.h4">@_summary.CandidateCount</MudText>
+                <MudText Typo="Typo.h4" Class="hl-kpi-value">@_summary.CandidateCount</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4 hl-kpi">
+                <MudIcon Icon="@Icons.Material.Filled.Science" Color="Color.Primary" />
                 <MudText Typo="Typo.overline">Resume Analyses</MudText>
-                <MudText Typo="Typo.h4">@_summary.ResumeAnalysisCount</MudText>
+                <MudText Typo="Typo.h4" Class="hl-kpi-value">@_summary.ResumeAnalysisCount</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4 hl-kpi">
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Color="Color.Primary" />
                 <MudText Typo="Typo.overline">Match Results</MudText>
-                <MudText Typo="Typo.h4">@_summary.MatchResultCount</MudText>
+                <MudText Typo="Typo.h4" Class="hl-kpi-value">@_summary.MatchResultCount</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
 
     <MudGrid Class="mt-2">
         <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4">
+            <MudPaper Class="pa-4 hl-panel">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                    <MudText Typo="Typo.h6">Latest Jobs</MudText>
+                    <MudText Typo="Typo.h6" Class="hl-panel-title">Latest Jobs</MudText>
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/jobs">Open</MudButton>
                 </MudStack>
                 <MudDivider Class="my-2" />
-                <MudTable Items="_summary.LatestJobs" Dense="true" Hover="true">
+                <MudTable Items="_summary.LatestJobs" Dense="true" Hover="true" Class="hl-data-table">
                     <HeaderContent>
                         <MudTh>Title</MudTh>
                         <MudTh>Level</MudTh>
@@ -81,13 +98,13 @@ else
         </MudItem>
 
         <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4">
+            <MudPaper Class="pa-4 hl-panel">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                    <MudText Typo="Typo.h6">Latest Candidates</MudText>
+                    <MudText Typo="Typo.h6" Class="hl-panel-title">Latest Candidates</MudText>
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/candidates">Open</MudButton>
                 </MudStack>
                 <MudDivider Class="my-2" />
-                <MudTable Items="_summary.LatestCandidates" Dense="true" Hover="true">
+                <MudTable Items="_summary.LatestCandidates" Dense="true" Hover="true" Class="hl-data-table">
                     <HeaderContent>
                         <MudTh>Name</MudTh>
                         <MudTh>Email</MudTh>

@@ -5,20 +5,30 @@
 
 <PageTitle>Models</PageTitle>
 
-<MudText Typo="Typo.h4">Model Registry</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">
-    Track model versions, accuracy snapshots, and active deployment status.
-</MudText>
-
-<MudPaper Class="pa-4">
+<MudPaper Class="hl-page-hero mb-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-        <MudText Typo="Typo.h6">Saved Models</MudText>
+        <div>
+            <MudText Typo="Typo.h4" Class="hl-page-title">Model Registry</MudText>
+            <MudText Typo="Typo.body1" Class="hl-page-subtitle">
+                Track model versions, accuracy snapshots, and active deployment status.
+            </MudText>
+        </div>
+        <MudStack Row="true" Spacing="1">
+            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_rows.Count versions</MudChip>
+            <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Success">@_rows.Count(x => x.IsActive) active</MudChip>
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+<MudPaper Class="pa-4 hl-panel">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudText Typo="Typo.h6" Class="hl-panel-title">Saved Models</MudText>
         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">Refresh</MudButton>
     </MudStack>
 
     <MudDivider Class="my-3" />
 
-    <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading">
+    <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading" Class="hl-data-table">
         <HeaderContent>
             <MudTh>Model Type</MudTh>
             <MudTh>Version</MudTh>

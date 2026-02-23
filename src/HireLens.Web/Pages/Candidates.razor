@@ -9,15 +9,25 @@
 
 <PageTitle>Candidates</PageTitle>
 
-<MudText Typo="Typo.h4">Candidate Management</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">
-    Upload resumes and keep a clean view of incoming applicants.
-</MudText>
+<MudPaper Class="hl-page-hero mb-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.h4" Class="hl-page-title">Candidate Management</MudText>
+            <MudText Typo="Typo.body1" Class="hl-page-subtitle">
+                Upload resumes, track applicants, and keep your candidate pool searchable.
+            </MudText>
+        </div>
+        <MudStack Row="true" Spacing="1">
+            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_candidates.Count candidates</MudChip>
+            <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Info">Resume intake</MudChip>
+        </MudStack>
+    </MudStack>
+</MudPaper>
 
 <MudGrid>
     <MudItem xs="12" lg="4">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6">Upload Candidate Resume</MudText>
+        <MudPaper Class="pa-4 hl-panel">
+            <MudText Typo="Typo.h6" Class="hl-panel-title">Upload Candidate Resume</MudText>
             <MudDivider Class="my-3" />
 
             <MudTextField T="string"
@@ -31,12 +41,12 @@
                           Class="mt-3"
                           @bind-Value="_upload.Email" />
 
-            <MudPaper Class="pa-3 mt-3" Outlined="true">
+            <MudPaper Class="pa-3 mt-3 hl-file-box" Outlined="true">
                 <MudText Typo="Typo.caption">Resume (.pdf or .txt, max 10 MB)</MudText>
                 <InputFile OnChange="HandleFileSelected" class="mt-2" />
                 @if (!string.IsNullOrWhiteSpace(_selectedFileName))
                 {
-                    <MudText Typo="Typo.caption" Class="mt-2">Selected: @_selectedFileName</MudText>
+                    <MudText Typo="Typo.caption" Class="mt-2 hl-muted">Selected: @_selectedFileName</MudText>
                 }
             </MudPaper>
 
@@ -51,16 +61,23 @@
     </MudItem>
 
     <MudItem xs="12" lg="8">
-        <MudPaper Class="pa-4">
+        <MudPaper Class="pa-4 hl-panel">
             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                <MudText Typo="Typo.h6">Candidates</MudText>
+                <MudText Typo="Typo.h6" Class="hl-panel-title">Candidates</MudText>
                 <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">
                     Refresh
                 </MudButton>
             </MudStack>
-            <MudDivider Class="my-3" />
+            <MudTextField T="string"
+                          Class="my-3"
+                          Variant="Variant.Outlined"
+                          Immediate="true"
+                          Placeholder="Search by name, email, or file..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          @bind-Value="_searchText" />
 
-            <MudTable Items="_candidates" Hover="true" Dense="true" Loading="@_loading">
+            <MudTable Items="@FilteredCandidates" Hover="true" Dense="true" Loading="@_loading" Class="hl-data-table">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Email</MudTh>
@@ -90,6 +107,12 @@
     private string _selectedFileName = string.Empty;
     private bool _loading;
     private bool _uploading;
+    private string _searchText = string.Empty;
+
+    private IReadOnlyList<CandidateDto> FilteredCandidates =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _candidates
+            : _candidates.Where(IsMatch).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +211,16 @@
         _upload.Email = string.Empty;
         _selectedFile = null;
         _selectedFileName = string.Empty;
+    }
+
+    private bool IsMatch(CandidateDto item)
+    {
+        return Contains(item.FullName) || Contains(item.Email) || Contains(item.ResumeFileName);
+    }
+
+    private bool Contains(string value)
+    {
+        return value.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class UploadFormModel
