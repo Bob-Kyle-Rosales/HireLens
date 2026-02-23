@@ -1,0 +1,276 @@
+@page "/jobs"
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using HireLens.Application.DTOs
+@using HireLens.Application.Interfaces
+@using HireLens.Domain.Enums
+@inject IJobPostingService JobPostingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Jobs</PageTitle>
+
+<MudText Typo="Typo.h4">Job Management</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Create roles, update requirements, and keep postings in one place.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">@(_editingJobId is null ? "Create Job Posting" : "Edit Job Posting")</MudText>
+            <MudDivider Class="my-3" />
+
+            <MudTextField T="string"
+                          Label="Title"
+                          Variant="Variant.Outlined"
+                          HelperText="Use a clear role title."
+                          @bind-Value="_form.Title" />
+
+            <MudTextField T="string"
+                          Label="Description"
+                          Variant="Variant.Outlined"
+                          Lines="6"
+                          Class="mt-3"
+                          @bind-Value="_form.Description" />
+
+            <MudTextField T="string"
+                          Label="Required Skills (comma-separated)"
+                          Variant="Variant.Outlined"
+                          Class="mt-3"
+                          @bind-Value="_form.RequiredSkillsText" />
+
+            <MudTextField T="string"
+                          Label="Optional Skills (comma-separated)"
+                          Variant="Variant.Outlined"
+                          Class="mt-3"
+                          @bind-Value="_form.OptionalSkillsText" />
+
+            <MudSelect T="SeniorityLevel"
+                       Label="Seniority Level"
+                       Variant="Variant.Outlined"
+                       Class="mt-3"
+                       @bind-Value="_form.SeniorityLevel">
+                <MudSelectItem Value="SeniorityLevel.Junior">Junior</MudSelectItem>
+                <MudSelectItem Value="SeniorityLevel.Mid">Mid</MudSelectItem>
+                <MudSelectItem Value="SeniorityLevel.Senior">Senior</MudSelectItem>
+                <MudSelectItem Value="SeniorityLevel.Lead">Lead</MudSelectItem>
+            </MudSelect>
+
+            <MudStack Row="true" Class="mt-4" Spacing="2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@_busy"
+                           OnClick="SaveAsync">
+                    @(_editingJobId is null ? "Create" : "Update")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="@_busy"
+                           OnClick="ResetForm">
+                    Reset
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="pa-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.h6">Open Roles</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">
+                    Refresh
+                </MudButton>
+            </MudStack>
+
+            <MudDivider Class="my-3" />
+
+            <MudTable Items="_jobs" Hover="true" Dense="true" Loading="@_loading">
+                <HeaderContent>
+                    <MudTh>Title</MudTh>
+                    <MudTh>Skills</MudTh>
+                    <MudTh>Seniority</MudTh>
+                    <MudTh>Updated</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Title">@context.Title</MudTd>
+                    <MudTd DataLabel="Skills">
+                        <MudText Typo="Typo.caption">
+                            Req: @string.Join(", ", context.RequiredSkills.Take(3))
+                        </MudText>
+                        <MudText Typo="Typo.caption">
+                            Opt: @string.Join(", ", context.OptionalSkills.Take(3))
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Seniority">
+                        <MudChip Variant="Variant.Outlined" Color="Color.Secondary">
+                            @context.SeniorityLevel
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Updated">@context.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => StartEdit(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeleteAsync(context.Id))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2">No jobs yet.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly JobFormModel _form = new();
+    private List<JobPostingDto> _jobs = [];
+    private Guid? _editingJobId;
+    private bool _loading;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _jobs = (await JobPostingService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load jobs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_form.Title) || string.IsNullOrWhiteSpace(_form.Description))
+        {
+            Snackbar.Add("Title and Description are required.", Severity.Warning);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var request = new JobPostingUpsertRequest
+            {
+                Title = _form.Title.Trim(),
+                Description = _form.Description.Trim(),
+                RequiredSkills = SplitSkills(_form.RequiredSkillsText),
+                OptionalSkills = SplitSkills(_form.OptionalSkillsText),
+                SeniorityLevel = _form.SeniorityLevel
+            };
+
+            if (_editingJobId is null)
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
+                await JobPostingService.CreateAsync(request, userId);
+                Snackbar.Add("Job posting created.", Severity.Success);
+            }
+            else
+            {
+                await JobPostingService.UpdateAsync(_editingJobId.Value, request);
+                Snackbar.Add("Job posting updated.", Severity.Success);
+            }
+
+            ResetForm();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Save failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void StartEdit(JobPostingDto item)
+    {
+        _editingJobId = item.Id;
+        _form.Title = item.Title;
+        _form.Description = item.Description;
+        _form.RequiredSkillsText = string.Join(", ", item.RequiredSkills);
+        _form.OptionalSkillsText = string.Join(", ", item.OptionalSkills);
+        _form.SeniorityLevel = item.SeniorityLevel;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        try
+        {
+            var deleted = await JobPostingService.DeleteAsync(id);
+            if (deleted)
+            {
+                Snackbar.Add("Job posting deleted.", Severity.Info);
+                if (_editingJobId == id)
+                {
+                    ResetForm();
+                }
+
+                await ReloadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Job posting was not found.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Delete failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ResetForm()
+    {
+        _editingJobId = null;
+        _form.Title = string.Empty;
+        _form.Description = string.Empty;
+        _form.RequiredSkillsText = string.Empty;
+        _form.OptionalSkillsText = string.Empty;
+        _form.SeniorityLevel = SeniorityLevel.Mid;
+    }
+
+    private static List<string> SplitSkills(string raw)
+    {
+        return raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private sealed class JobFormModel
+    {
+        [Required]
+        public string Title { get; set; } = string.Empty;
+
+        [Required]
+        public string Description { get; set; } = string.Empty;
+
+        public string RequiredSkillsText { get; set; } = string.Empty;
+        public string OptionalSkillsText { get; set; } = string.Empty;
+        public SeniorityLevel SeniorityLevel { get; set; } = SeniorityLevel.Mid;
+    }
+}
