@@ -68,6 +68,23 @@ h1:focus {
     color: var(--hl-muted);
 }
 
+.hl-kpi {
+    position: relative;
+    overflow: hidden;
+}
+
+.hl-kpi::after {
+    content: "";
+    position: absolute;
+    right: -18px;
+    top: -18px;
+    width: 88px;
+    height: 88px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(15, 118, 110, 0.18), rgba(15, 118, 110, 0));
+    pointer-events: none;
+}
+
 @keyframes hl-fade-up {
     from {
         opacity: 0;

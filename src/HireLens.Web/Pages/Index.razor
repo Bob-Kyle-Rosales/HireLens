@@ -1,12 +1,135 @@
 @page "/"
+@using HireLens.Web.Services
+@inject IDashboardReadService DashboardReadService
+@inject ISnackbar Snackbar
 
-<PageTitle>HireLens</PageTitle>
+<PageTitle>Dashboard</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
-    <MudPaper Class="pa-6">
-        <MudText Typo="Typo.h4">HireLens Dashboard</MudText>
-        <MudText Class="mt-2" Typo="Typo.body1">
-            Blazor UI scaffold is active. Navigation and feature pages will be added next.
-        </MudText>
-    </MudPaper>
-</MudContainer>
+<MudText Typo="Typo.h4">Hiring Dashboard</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Snapshot of pipeline activity, model analysis progress, and match output.
+</MudText>
+
+@if (_loading)
+{
+    <MudGrid>
+        @for (var i = 0; i < 4; i++)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <MudSkeleton Height="112px" Animation="Animation.Wave" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (_summary is null)
+{
+    <MudAlert Severity="Severity.Warning">Could not load dashboard metrics.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 hl-kpi">
+                <MudText Typo="Typo.overline">Jobs</MudText>
+                <MudText Typo="Typo.h4">@_summary.JobCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 hl-kpi">
+                <MudText Typo="Typo.overline">Candidates</MudText>
+                <MudText Typo="Typo.h4">@_summary.CandidateCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 hl-kpi">
+                <MudText Typo="Typo.overline">Resume Analyses</MudText>
+                <MudText Typo="Typo.h4">@_summary.ResumeAnalysisCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 hl-kpi">
+                <MudText Typo="Typo.overline">Match Results</MudText>
+                <MudText Typo="Typo.h4">@_summary.MatchResultCount</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-2">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.h6">Latest Jobs</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/jobs">Open</MudButton>
+                </MudStack>
+                <MudDivider Class="my-2" />
+                <MudTable Items="_summary.LatestJobs" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>Title</MudTh>
+                        <MudTh>Level</MudTh>
+                        <MudTh>Updated</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Title">@context.Title</MudTd>
+                        <MudTd DataLabel="Level">@context.SeniorityLevel</MudTd>
+                        <MudTd DataLabel="Updated">@context.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">No jobs yet.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.h6">Latest Candidates</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/candidates">Open</MudButton>
+                </MudStack>
+                <MudDivider Class="my-2" />
+                <MudTable Items="_summary.LatestCandidates" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Uploaded</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">@context.FullName</MudTd>
+                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                        <MudTd DataLabel="Uploaded">@context.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">No candidates yet.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private DashboardSummaryDto? _summary;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSummaryAsync();
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        _loading = true;
+        try
+        {
+            _summary = await DashboardReadService.GetSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load dashboard: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
