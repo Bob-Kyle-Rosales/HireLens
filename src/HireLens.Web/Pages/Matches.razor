@@ -1,0 +1,205 @@
+@page "/matches"
+@using HireLens.Web.Services
+@inject IDashboardReadService DashboardReadService
+@inject ISnackbar Snackbar
+
+<PageTitle>Matches</PageTitle>
+
+<MudText Typo="Typo.h4">Match Results</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Review ranked candidates per job and inspect the score explanation details.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="pa-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                <MudSelect T="Guid?"
+                           Label="Job Filter"
+                           Variant="Variant.Outlined"
+                           Value="_selectedJobId"
+                           ValueChanged="OnJobFilterChanged">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Jobs</MudSelectItem>
+                    @foreach (var job in _jobs)
+                    {
+                        <MudSelectItem T="Guid?" Value="@job.Id">@job.Title</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSpacer />
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">Refresh</MudButton>
+            </MudStack>
+
+            <MudTable Items="_rows" Hover="true" Dense="true" Loading="@_loading">
+                <HeaderContent>
+                    <MudTh>Candidate</MudTh>
+                    <MudTh>Job</MudTh>
+                    <MudTh>Match Score</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Candidate">@context.CandidateName</MudTd>
+                    <MudTd DataLabel="Job">@context.JobTitle</MudTd>
+                    <MudTd DataLabel="Match Score">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption">@context.MatchScore.ToString("0.0")</MudText>
+                            <MudProgressLinear Value="@context.MatchScore"
+                                               Min="0"
+                                               Max="100"
+                                               Rounded="true"
+                                               Color="@GetScoreColor(context.MatchScore)" />
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Category">
+                        <MudText Typo="Typo.caption">@context.PredictedCategory</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @FormatConfidence(context.ConfidenceScore)
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   OnClick="@(() => SelectRow(context))">
+                            Explain
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2">No match results available yet.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">Explanation</MudText>
+            <MudDivider Class="my-2" />
+
+            @if (_selected is null)
+            {
+                <MudText Typo="Typo.body2">Select a row to inspect skill overlap and gaps.</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle2">@_selected.CandidateName</MudText>
+                <MudText Typo="Typo.caption">@_selected.JobTitle</MudText>
+                <MudChip Class="mt-2" Variant="Variant.Outlined" Color="@GetScoreColor(_selected.MatchScore)">
+                    Score @_selected.MatchScore.ToString("0.0")
+                </MudChip>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Matched Skills</MudText>
+                <MudChipSet Class="mt-1">
+                    @foreach (var skill in SplitTokens(_selected.MatchedSkills))
+                    {
+                        <MudChip Color="Color.Success" Variant="Variant.Outlined">@skill</MudChip>
+                    }
+                </MudChipSet>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Missing Skills</MudText>
+                <MudChipSet Class="mt-1">
+                    @foreach (var skill in SplitTokens(_selected.MissingSkills))
+                    {
+                        <MudChip Color="Color.Error" Variant="Variant.Outlined">@skill</MudChip>
+                    }
+                </MudChipSet>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Top Overlapping Keywords</MudText>
+                <MudChipSet Class="mt-1">
+                    @foreach (var keyword in SplitTokens(_selected.TopOverlappingKeywords))
+                    {
+                        <MudChip Color="Color.Info" Variant="Variant.Outlined">@keyword</MudChip>
+                    }
+                </MudChipSet>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<JobLookupDto> _jobs = [];
+    private List<MatchResultRowDto> _rows = [];
+    private MatchResultRowDto? _selected;
+    private Guid? _selectedJobId;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJobsAsync();
+        await ReloadAsync();
+    }
+
+    private async Task LoadJobsAsync()
+    {
+        try
+        {
+            _jobs = (await DashboardReadService.GetJobLookupAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load jobs: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _rows = (await DashboardReadService.GetMatchResultsAsync(_selectedJobId)).ToList();
+            _selected = _rows.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load matches: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnJobFilterChanged(Guid? value)
+    {
+        _selectedJobId = value;
+        await ReloadAsync();
+    }
+
+    private void SelectRow(MatchResultRowDto row)
+    {
+        _selected = row;
+    }
+
+    private static Color GetScoreColor(double score)
+    {
+        if (score >= 80)
+        {
+            return Color.Success;
+        }
+
+        if (score >= 60)
+        {
+            return Color.Warning;
+        }
+
+        return Color.Error;
+    }
+
+    private static string FormatConfidence(double? confidence)
+    {
+        return confidence is null ? "No confidence data" : $"Confidence: {confidence:P0}";
+    }
+
+    private static IReadOnlyList<string> SplitTokens(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return ["None"];
+        }
+
+        return raw
+            .Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+}
