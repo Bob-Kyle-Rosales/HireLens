@@ -44,8 +44,6 @@
                         <MudStack Spacing="1">
                             <MudText Typo="Typo.caption">@context.MatchScore.ToString("0.0")</MudText>
                             <MudProgressLinear Value="@context.MatchScore"
-                                               Min="0"
-                                               Max="100"
                                                Rounded="true"
                                                Color="@GetScoreColor(context.MatchScore)" />
                         </MudStack>
