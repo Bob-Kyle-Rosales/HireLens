@@ -56,6 +56,46 @@ dotnet build HireLens.sln
 dotnet run --project src/HireLens.Web/HireLens.Web.csproj
 ```
 
+## Run With Docker
+
+Prerequisites:
+
+- Docker Desktop
+
+Steps:
+
+1. Create a local env file from the template:
+
+```powershell
+copy .env.example .env
+```
+
+2. Set a strong `MSSQL_SA_PASSWORD` in `.env` (SQL Server requires password complexity).
+
+3. Build and run:
+
+```powershell
+docker compose up --build
+```
+
+4. Open:
+
+- App: `http://localhost:8080`
+- Swagger (Development): `http://localhost:8080/swagger`
+- SQL Server from host: `localhost,14333`
+
+Stop containers:
+
+```powershell
+docker compose down
+```
+
+Stop and remove DB volume:
+
+```powershell
+docker compose down -v
+```
+
 ## Next Phases
 
 - Add ML.NET analysis and matching engine
