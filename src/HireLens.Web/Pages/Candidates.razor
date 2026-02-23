@@ -1,0 +1,201 @@
+@page "/candidates"
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using HireLens.Application.DTOs
+@using HireLens.Application.Interfaces
+@inject ICandidateService CandidateService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Candidates</PageTitle>
+
+<MudText Typo="Typo.h4">Candidate Management</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Upload resumes and keep a clean view of incoming applicants.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">Upload Candidate Resume</MudText>
+            <MudDivider Class="my-3" />
+
+            <MudTextField T="string"
+                          Label="Full Name"
+                          Variant="Variant.Outlined"
+                          @bind-Value="_upload.FullName" />
+
+            <MudTextField T="string"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          Class="mt-3"
+                          @bind-Value="_upload.Email" />
+
+            <MudPaper Class="pa-3 mt-3" Outlined="true">
+                <MudText Typo="Typo.caption">Resume (.pdf or .txt, max 10 MB)</MudText>
+                <InputFile OnChange="HandleFileSelected" class="mt-2" />
+                @if (!string.IsNullOrWhiteSpace(_selectedFileName))
+                {
+                    <MudText Typo="Typo.caption" Class="mt-2">Selected: @_selectedFileName</MudText>
+                }
+            </MudPaper>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Class="mt-4"
+                       Disabled="@_uploading"
+                       OnClick="UploadAsync">
+                Upload
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="pa-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.h6">Candidates</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">
+                    Refresh
+                </MudButton>
+            </MudStack>
+            <MudDivider Class="my-3" />
+
+            <MudTable Items="_candidates" Hover="true" Dense="true" Loading="@_loading">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Resume</MudTh>
+                    <MudTh>Uploaded</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.FullName</MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Resume">@context.ResumeFileName</MudTd>
+                    <MudTd DataLabel="Uploaded">@context.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2">No candidates uploaded yet.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private const long MaxResumeSizeBytes = 10 * 1024 * 1024;
+
+    private readonly UploadFormModel _upload = new();
+    private List<CandidateDto> _candidates = [];
+    private IBrowserFile? _selectedFile;
+    private string _selectedFileName = string.Empty;
+    private bool _loading;
+    private bool _uploading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _candidates = (await CandidateService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load candidates: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        _selectedFile = args.File;
+        _selectedFileName = _selectedFile.Name;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_uploading)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_upload.FullName) || string.IsNullOrWhiteSpace(_upload.Email))
+        {
+            Snackbar.Add("Full Name and Email are required.", Severity.Warning);
+            return;
+        }
+
+        if (_selectedFile is null)
+        {
+            Snackbar.Add("Please select a resume file.", Severity.Warning);
+            return;
+        }
+
+        if (_selectedFile.Size > MaxResumeSizeBytes)
+        {
+            Snackbar.Add("Resume exceeds 10 MB limit.", Severity.Warning);
+            return;
+        }
+
+        _uploading = true;
+
+        try
+        {
+            await using var stream = _selectedFile.OpenReadStream(MaxResumeSizeBytes);
+            await using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
+
+            var request = new CandidateUploadRequest
+            {
+                FullName = _upload.FullName.Trim(),
+                Email = _upload.Email.Trim(),
+                ResumeFileName = _selectedFile.Name,
+                ResumeContentType = string.IsNullOrWhiteSpace(_selectedFile.ContentType)
+                    ? "application/octet-stream"
+                    : _selectedFile.ContentType,
+                ResumeContent = memoryStream.ToArray(),
+                UploadedByUserId = userId
+            };
+
+            await CandidateService.UploadAsync(request);
+            Snackbar.Add("Candidate uploaded.", Severity.Success);
+            ResetUploadForm();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private void ResetUploadForm()
+    {
+        _upload.FullName = string.Empty;
+        _upload.Email = string.Empty;
+        _selectedFile = null;
+        _selectedFileName = string.Empty;
+    }
+
+    private sealed class UploadFormModel
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required]
+        public string Email { get; set; } = string.Empty;
+    }
+}
