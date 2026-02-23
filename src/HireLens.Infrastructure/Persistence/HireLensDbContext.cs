@@ -9,6 +9,9 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
 {
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
     public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<ResumeAnalysis> ResumeAnalyses => Set<ResumeAnalysis>();
+    public DbSet<MatchResult> MatchResults => Set<MatchResult>();
+    public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,6 +38,55 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
             entity.Property(x => x.ResumeText).HasMaxLength(200_000).IsRequired();
             entity.HasIndex(x => x.Email);
             entity.HasIndex(x => x.CreatedUtc);
+        });
+
+        builder.Entity<ModelVersion>(entity =>
+        {
+            entity.Property(x => x.Version).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ModelType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.StoragePath).HasMaxLength(1000).IsRequired();
+            entity.HasIndex(x => new { x.ModelType, x.Version }).IsUnique();
+            entity.HasIndex(x => new { x.ModelType, x.IsActive });
+            entity.HasIndex(x => x.TrainedUtc);
+        });
+
+        builder.Entity<ResumeAnalysis>(entity =>
+        {
+            entity.Property(x => x.PredictedCategory).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ExtractedSkills).HasMaxLength(4000).IsRequired();
+            entity.HasOne<Candidate>()
+                .WithMany()
+                .HasForeignKey(x => x.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ModelVersion>()
+                .WithMany()
+                .HasForeignKey(x => x.ModelVersionId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.CandidateId);
+            entity.HasIndex(x => x.AnalyzedUtc);
+        });
+
+        builder.Entity<MatchResult>(entity =>
+        {
+            entity.Property(x => x.MatchedSkills).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.MissingSkills).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.TopOverlappingKeywords).HasMaxLength(2000).IsRequired();
+            entity.HasOne<JobPosting>()
+                .WithMany()
+                .HasForeignKey(x => x.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Candidate>()
+                .WithMany()
+                .HasForeignKey(x => x.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ResumeAnalysis>()
+                .WithMany()
+                .HasForeignKey(x => x.ResumeAnalysisId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.JobPostingId);
+            entity.HasIndex(x => x.CandidateId);
+            entity.HasIndex(x => x.GeneratedUtc);
+            entity.HasIndex(x => new { x.JobPostingId, x.MatchScore });
         });
     }
 }
