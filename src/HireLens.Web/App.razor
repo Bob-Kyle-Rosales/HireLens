@@ -1,0 +1,16 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not Found</PageTitle>
+            <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+                    The page you requested could not be found.
+                </MudAlert>
+            </MudContainer>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
