@@ -3,6 +3,7 @@ using HireLens.Infrastructure.Identity;
 using HireLens.Infrastructure.Persistence;
 using HireLens.Infrastructure.Seeding;
 using HireLens.Web.Middleware;
+using HireLens.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -16,6 +17,7 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMudServices();
+builder.Services.AddScoped<IDashboardReadService, DashboardReadService>();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
