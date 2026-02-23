@@ -91,7 +91,7 @@ namespace HireLens.Infrastructure.Persistence.Migrations
                         column: x => x.ResumeAnalysisId,
                         principalTable: "ResumeAnalyses",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        onDelete: ReferentialAction.NoAction);
                 });
 
             migrationBuilder.CreateIndex(

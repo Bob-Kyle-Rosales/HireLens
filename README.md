@@ -33,6 +33,7 @@ Edit `src/HireLens.Web/appsettings.json`:
 - `Database:Provider`: `SqlServer` (default) or `PostgreSql`
 - `ConnectionStrings:DefaultConnection`: database connection string
 - `SeedAdmin:Email` / `SeedAdmin:Password`: optional initial admin account
+- `SeedData:Enabled`: seed demo jobs/candidates/analyses/matches on startup when DB is empty
 
 ## Migrations
 

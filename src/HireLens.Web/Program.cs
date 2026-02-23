@@ -89,5 +89,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 await RoleSeeder.SeedRolesAndAdminAsync(app.Services, app.Configuration);
+await InitialDataSeeder.SeedAsync(app.Services, app.Configuration);
 
 app.Run();

@@ -468,7 +468,7 @@ namespace HireLens.Infrastructure.Persistence.Migrations
                     b.HasOne("HireLens.Domain.Entities.ResumeAnalysis", null)
                         .WithMany()
                         .HasForeignKey("ResumeAnalysisId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("HireLens.Domain.Entities.ResumeAnalysis", b =>

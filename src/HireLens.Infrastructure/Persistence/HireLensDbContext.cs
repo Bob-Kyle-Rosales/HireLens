@@ -82,7 +82,7 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
             entity.HasOne<ResumeAnalysis>()
                 .WithMany()
                 .HasForeignKey(x => x.ResumeAnalysisId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasIndex(x => x.JobPostingId);
             entity.HasIndex(x => x.CandidateId);
             entity.HasIndex(x => x.GeneratedUtc);
