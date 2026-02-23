@@ -36,6 +36,50 @@ h1:focus {
     border: 1px solid var(--hl-stroke);
 }
 
+.hl-shell {
+    min-height: 100vh;
+}
+
+.hl-appbar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(10px);
+}
+
+.hl-drawer {
+    border-right: 1px solid var(--hl-stroke);
+}
+
+.hl-main {
+    padding: 1.25rem;
+    animation: hl-fade-up 260ms ease-out;
+}
+
+.hl-nav-menu .mud-nav-link {
+    border-radius: 10px;
+    margin-bottom: 0.25rem;
+}
+
+.hl-nav-menu .mud-nav-link.active {
+    background: linear-gradient(90deg, rgba(15, 118, 110, 0.14), rgba(21, 94, 117, 0.06));
+}
+
+.hl-nav-kicker {
+    letter-spacing: 0.08em;
+    color: var(--hl-muted);
+}
+
+@keyframes hl-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #2b9a61;
 }

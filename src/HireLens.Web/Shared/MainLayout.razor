@@ -1,0 +1,70 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout Class="hl-shell">
+    <MudAppBar Elevation="0" Dense="true" Class="hl-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6">HireLens</MudText>
+        <MudSpacer />
+        <MudChip Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">Backend + UI</MudChip>
+    </MudAppBar>
+
+    <MudDrawer Open="@_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1" Class="hl-drawer">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="hl-main">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private static readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#0f766e",
+            Secondary = "#d97706",
+            Tertiary = "#155e75",
+            Background = "#f3f7f6",
+            AppbarBackground = "#0f172a",
+            AppbarText = "#f8fafc",
+            DrawerBackground = "#ffffff",
+            Surface = "#ffffff",
+            TextPrimary = "#1f2937",
+            TextSecondary = "#4b5563"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "12px"
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Manrope", "Segoe UI", "sans-serif"]
+            },
+            H4 = new H4Typography
+            {
+                FontFamily = ["Manrope", "Segoe UI", "sans-serif"],
+                FontWeight = 800
+            },
+            H5 = new H5Typography
+            {
+                FontFamily = ["Manrope", "Segoe UI", "sans-serif"],
+                FontWeight = 700
+            }
+        }
+    };
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}
