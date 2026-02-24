@@ -26,15 +26,15 @@
     <MudItem xs="12" lg="8">
         <MudPaper Class="pa-4 hl-panel">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
-                <MudSelect T="Guid?"
+                <MudSelect T="string"
                            Label="Job Filter"
                            Variant="Variant.Outlined"
-                           Value="_selectedJobId"
+                           Value="_selectedJobFilterValue"
                            ValueChanged="OnJobFilterChanged">
-                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Jobs</MudSelectItem>
+                    <MudSelectItem T="string" Value="@AllJobsFilterValue">All Jobs</MudSelectItem>
                     @foreach (var job in _jobs)
                     {
-                        <MudSelectItem T="Guid?" Value="@job.Id">@job.Title</MudSelectItem>
+                        <MudSelectItem T="string" Value="@job.Id.ToString()">@job.Title</MudSelectItem>
                     }
                 </MudSelect>
                 <MudSpacer />
@@ -127,10 +127,13 @@
 </MudGrid>
 
 @code {
+    private const string AllJobsFilterValue = "__all__";
+
     private List<JobLookupDto> _jobs = [];
     private List<MatchResultRowDto> _rows = [];
     private MatchResultRowDto? _selected;
     private Guid? _selectedJobId;
+    private string _selectedJobFilterValue = AllJobsFilterValue;
     private bool _loading;
 
     protected override async Task OnInitializedAsync()
@@ -169,9 +172,24 @@
         }
     }
 
-    private async Task OnJobFilterChanged(Guid? value)
+    private async Task OnJobFilterChanged(string value)
     {
-        _selectedJobId = value;
+        _selectedJobFilterValue = value;
+
+        if (string.Equals(value, AllJobsFilterValue, StringComparison.Ordinal))
+        {
+            _selectedJobId = null;
+        }
+        else if (Guid.TryParse(value, out var parsedJobId))
+        {
+            _selectedJobId = parsedJobId;
+        }
+        else
+        {
+            _selectedJobId = null;
+            _selectedJobFilterValue = AllJobsFilterValue;
+        }
+
         await ReloadAsync();
     }
 

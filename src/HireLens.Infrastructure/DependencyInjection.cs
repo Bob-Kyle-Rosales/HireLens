@@ -15,7 +15,23 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-        services.AddDbContext<HireLensDbContext>(options =>
+        services.AddDbContext<HireLensDbContext>(
+            options =>
+            {
+                if (string.Equals(provider, "PostgreSql", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(provider, "Postgres", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.UseNpgsql(connectionString);
+                }
+                else
+                {
+                    options.UseSqlServer(connectionString);
+                }
+            },
+            contextLifetime: ServiceLifetime.Scoped,
+            optionsLifetime: ServiceLifetime.Singleton);
+
+        services.AddDbContextFactory<HireLensDbContext>(options =>
         {
             if (string.Equals(provider, "PostgreSql", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(provider, "Postgres", StringComparison.OrdinalIgnoreCase))
