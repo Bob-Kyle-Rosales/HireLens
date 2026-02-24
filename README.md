@@ -15,11 +15,12 @@ HireLens is currently in a backend-first phase built on .NET 8 with REST APIs, I
 - Role policies (`RecruiterOrAdmin`, `AdminOnly`)
 - Auth and admin endpoint rate limiting
 - Jobs REST API (`/api/jobs`)
-- Candidates REST API (`/api/candidates`, `/api/candidates/upload`)
+- Candidates REST API (`/api/candidates`, `/api/candidates/upload`) with job-targeted applications
 - Resume analysis API (`/api/analyses/*`)
 - Matching API (`/api/matches/*`)
 - Model management and training API (`/api/models/*`)
 - Resume text extraction for `.pdf` and `.txt`
+- Job application tracking (`Submitted` -> `Analyzed` -> `Scored` / `Failed`)
 - Correlation ID middleware (`X-Correlation-ID`)
 - Global exception middleware with `ProblemDetails` JSON for API errors
 - Automatic migration apply on startup + role seeding
