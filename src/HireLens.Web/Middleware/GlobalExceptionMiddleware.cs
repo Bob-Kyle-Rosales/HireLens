@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Mvc;
 
 namespace HireLens.Web.Middleware;
 
@@ -23,16 +24,31 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
             }
 
             context.Response.Clear();
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            var statusCode = ex is InvalidOperationException
+                ? HttpStatusCode.BadRequest
+                : HttpStatusCode.InternalServerError;
+            context.Response.StatusCode = (int)statusCode;
 
             if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new
+                var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.HeaderName, out var value)
+                    ? value?.ToString()
+                    : context.TraceIdentifier;
+
+                var details = new ProblemDetails
                 {
-                    title = "Unhandled exception",
-                    detail = "An unexpected error occurred."
-                });
+                    Type = "https://httpstatuses.com/" + context.Response.StatusCode,
+                    Title = statusCode == HttpStatusCode.BadRequest ? "Request validation failed" : "Unhandled exception",
+                    Detail = statusCode == HttpStatusCode.BadRequest
+                        ? ex.Message
+                        : "An unexpected error occurred.",
+                    Status = context.Response.StatusCode,
+                    Instance = context.Request.Path
+                };
+                details.Extensions["correlationId"] = correlationId;
+
+                await context.Response.WriteAsJsonAsync(details);
                 return;
             }
 
