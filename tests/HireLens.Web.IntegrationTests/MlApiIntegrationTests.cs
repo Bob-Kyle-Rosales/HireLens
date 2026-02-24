@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Xunit;
 
@@ -72,5 +73,47 @@ public sealed class MlApiIntegrationTests(TestWebApplicationFactory factory) : I
         Assert.Equal(JsonValueKind.Array, topMatch.GetProperty("matchedSkills").ValueKind);
         Assert.Equal(JsonValueKind.Array, topMatch.GetProperty("missingSkills").ValueKind);
         Assert.Equal(JsonValueKind.Array, topMatch.GetProperty("topOverlappingKeywords").ValueKind);
+    }
+
+    [Fact]
+    public async Task Candidate_Upload_Requires_Job_And_Creates_Application_Context()
+    {
+        using var client = factory.CreateClient();
+
+        var jobs = await client.GetFromJsonAsync<JsonElement[]>("/api/jobs");
+        Assert.NotNull(jobs);
+        Assert.NotEmpty(jobs!);
+
+        var jobId = jobs![0].GetProperty("id").GetGuid().ToString();
+
+        using var invalidContent = new MultipartFormDataContent
+        {
+            { new StringContent("Upload Tester"), "FullName" },
+            { new StringContent("upload.tester@example.com"), "Email" }
+        };
+
+        var invalidFile = new ByteArrayContent(Encoding.UTF8.GetBytes("C# .NET"));
+        invalidContent.Add(invalidFile, "Resume", "resume.txt");
+
+        var invalidResponse = await client.PostAsync("/api/candidates/upload", invalidContent);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidResponse.StatusCode);
+
+        using var validContent = new MultipartFormDataContent
+        {
+            { new StringContent("Upload Tester"), "FullName" },
+            { new StringContent("upload.tester@example.com"), "Email" },
+            { new StringContent(jobId), "JobPostingId" }
+        };
+
+        var validFile = new ByteArrayContent(Encoding.UTF8.GetBytes("C# .NET ASP.NET Core SQL Server Docker"));
+        validContent.Add(validFile, "Resume", "resume.txt");
+
+        var validResponse = await client.PostAsync("/api/candidates/upload", validContent);
+        validResponse.EnsureSuccessStatusCode();
+
+        var payload = await validResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(jobId, payload.GetProperty("latestAppliedJobPostingId").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(payload.GetProperty("latestAppliedJobTitle").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(payload.GetProperty("latestApplicationStatus").GetString()));
     }
 }

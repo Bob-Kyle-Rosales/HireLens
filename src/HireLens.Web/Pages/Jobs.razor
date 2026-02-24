@@ -4,6 +4,7 @@
 @using HireLens.Application.DTOs
 @using HireLens.Application.Interfaces
 @using HireLens.Domain.Enums
+@inject NavigationManager NavigationManager
 @inject IJobPostingService JobPostingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISnackbar Snackbar
@@ -128,6 +129,10 @@
                     </MudTd>
                     <MudTd DataLabel="Updated">@context.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
                     <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonAddAlt1"
+                                       Color="Color.Info"
+                                       Size="Size.Small"
+                                       OnClick="@(() => StartApplicationFlow(context.Id))" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                        Color="Color.Primary"
                                        Size="Size.Small"
@@ -266,6 +271,11 @@
         {
             Snackbar.Add($"Delete failed: {ex.Message}", Severity.Error);
         }
+    }
+
+    private void StartApplicationFlow(Guid jobPostingId)
+    {
+        NavigationManager.NavigateTo($"/candidates?jobId={jobPostingId}");
     }
 
     private void ResetForm()

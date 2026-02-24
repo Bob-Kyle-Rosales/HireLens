@@ -32,6 +32,11 @@ public sealed class CandidatesController(ICandidateService candidateService) : C
     [RequestSizeLimit(MaxResumeSizeBytes)]
     public async Task<ActionResult<CandidateDto>> Upload([FromForm] CandidateUploadForm form, CancellationToken cancellationToken)
     {
+        if (form.JobPostingId == Guid.Empty)
+        {
+            return BadRequest("Job posting is required.");
+        }
+
         if (form.Resume is null || form.Resume.Length == 0)
         {
             return BadRequest("Resume file is required.");
@@ -55,6 +60,7 @@ public sealed class CandidatesController(ICandidateService candidateService) : C
             ResumeFileName = form.Resume.FileName,
             ResumeContentType = string.IsNullOrWhiteSpace(form.Resume.ContentType) ? "application/octet-stream" : form.Resume.ContentType,
             ResumeContent = memory.ToArray(),
+            JobPostingId = form.JobPostingId,
             UploadedByUserId = userId
         };
 
@@ -73,6 +79,9 @@ public sealed class CandidateUploadForm
     [EmailAddress]
     [StringLength(320)]
     public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public Guid JobPostingId { get; set; }
 
     [Required]
     public IFormFile Resume { get; set; } = default!;

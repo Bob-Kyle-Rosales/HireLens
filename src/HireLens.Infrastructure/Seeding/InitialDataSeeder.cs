@@ -1,3 +1,5 @@
+using HireLens.Application.DTOs;
+using HireLens.Application.Interfaces;
 using HireLens.Domain.Entities;
 using HireLens.Domain.Enums;
 using HireLens.Infrastructure.Helpers;
@@ -24,10 +26,18 @@ public static class InitialDataSeeder
         var dbContext = scope.ServiceProvider.GetRequiredService<HireLensDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("InitialDataSeeder");
 
-        var hasAnyCoreData = await dbContext.JobPostings.AnyAsync() || await dbContext.Candidates.AnyAsync();
-        if (hasAnyCoreData)
+        var hasJobs = await dbContext.JobPostings.AnyAsync();
+        var hasCandidates = await dbContext.Candidates.AnyAsync();
+
+        if (hasJobs && hasCandidates)
         {
-            logger.LogInformation("Seed data skipped because existing job/candidate data was found.");
+            await BackfillApplicationFlowDataAsync(scope.ServiceProvider, dbContext, logger);
+            return;
+        }
+
+        if (hasJobs || hasCandidates)
+        {
+            logger.LogWarning("Seed data skipped because only partial core data exists (jobs={HasJobs}, candidates={HasCandidates}).", hasJobs, hasCandidates);
             return;
         }
 
@@ -49,20 +59,23 @@ public static class InitialDataSeeder
         var jobs = BuildJobs(now);
         var candidates = BuildCandidates(now);
         var analyses = BuildAnalyses(candidates, modelVersion, now);
-        var matches = BuildMatches(jobs, candidates, analyses, now);
+        var applications = BuildApplications(jobs, candidates, now);
+        var matches = BuildMatches(jobs, candidates, analyses, applications, now);
 
         dbContext.ModelVersions.Add(modelVersion);
         dbContext.JobPostings.AddRange(jobs);
         dbContext.Candidates.AddRange(candidates);
+        dbContext.JobApplications.AddRange(applications);
         dbContext.ResumeAnalyses.AddRange(analyses);
         dbContext.MatchResults.AddRange(matches);
 
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation(
-            "Seeded initial data: {Jobs} jobs, {Candidates} candidates, {Analyses} analyses, {Matches} matches.",
+            "Seeded initial data: {Jobs} jobs, {Candidates} candidates, {Applications} applications, {Analyses} analyses, {Matches} matches.",
             jobs.Count,
             candidates.Count,
+            applications.Count,
             analyses.Count,
             matches.Count);
     }
@@ -270,71 +283,129 @@ public static class InitialDataSeeder
         ];
     }
 
+    private static List<JobApplication> BuildApplications(
+        IReadOnlyList<JobPosting> jobs,
+        IReadOnlyList<Candidate> candidates,
+        DateTime now)
+    {
+        return
+        [
+            new JobApplication
+            {
+                JobPostingId = jobs[0].Id,
+                CandidateId = candidates[0].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-8),
+                UpdatedUtc = now.AddDays(-1)
+            },
+            new JobApplication
+            {
+                JobPostingId = jobs[1].Id,
+                CandidateId = candidates[1].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-7),
+                UpdatedUtc = now.AddDays(-1)
+            },
+            new JobApplication
+            {
+                JobPostingId = jobs[2].Id,
+                CandidateId = candidates[2].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-6),
+                UpdatedUtc = now.AddDays(-1)
+            },
+            new JobApplication
+            {
+                JobPostingId = jobs[3].Id,
+                CandidateId = candidates[3].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-5),
+                UpdatedUtc = now.AddDays(-1)
+            },
+            new JobApplication
+            {
+                JobPostingId = jobs[0].Id,
+                CandidateId = candidates[4].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-4),
+                UpdatedUtc = now.AddDays(-1)
+            },
+            new JobApplication
+            {
+                JobPostingId = jobs[1].Id,
+                CandidateId = candidates[5].Id,
+                Status = ApplicationStatus.Scored,
+                AppliedUtc = now.AddDays(-3),
+                UpdatedUtc = now.AddDays(-1)
+            }
+        ];
+    }
+
     private static List<MatchResult> BuildMatches(
         IReadOnlyList<JobPosting> jobs,
         IReadOnlyList<Candidate> candidates,
         IReadOnlyList<ResumeAnalysis> analyses,
+        IReadOnlyList<JobApplication> applications,
         DateTime now)
     {
+        var jobsById = jobs.ToDictionary(x => x.Id);
+        var candidatesById = candidates.ToDictionary(x => x.Id);
         var analysisByCandidateId = analyses.ToDictionary(x => x.CandidateId);
         var results = new List<MatchResult>();
 
-        foreach (var job in jobs)
+        foreach (var application in applications)
         {
+            if (!jobsById.TryGetValue(application.JobPostingId, out var job) ||
+                !candidatesById.TryGetValue(application.CandidateId, out var candidate))
+            {
+                continue;
+            }
+
             var requiredSkills = TextProcessing.ParseSkillList(job.RequiredSkills);
             var optionalSkills = TextProcessing.ParseSkillList(job.OptionalSkills);
             var jobKeywords = TextProcessing.TokenizeKeywords($"{job.Title} {job.Description} {job.RequiredSkills} {job.OptionalSkills}");
 
-            foreach (var candidate in candidates)
+            var resumeNormalized = TextProcessing.NormalizeText(candidate.ResumeText);
+            var matchedRequired = requiredSkills
+                .Where(skill => ContainsSkill(resumeNormalized, skill))
+                .ToArray();
+            var missingRequired = requiredSkills
+                .Except(matchedRequired, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var matchedOptional = optionalSkills
+                .Where(skill => ContainsSkill(resumeNormalized, skill))
+                .ToArray();
+
+            var resumeKeywords = TextProcessing.TokenizeKeywords(candidate.ResumeText);
+            var overlappingKeywords = jobKeywords
+                .Intersect(resumeKeywords, StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToArray();
+
+            var requiredCoverage = requiredSkills.Count == 0
+                ? 1.0
+                : (double)matchedRequired.Length / requiredSkills.Count;
+            var optionalCoverage = optionalSkills.Count == 0
+                ? 0.0
+                : (double)matchedOptional.Length / optionalSkills.Count;
+            var keywordOverlap = jobKeywords.Count == 0
+                ? 0.0
+                : (double)overlappingKeywords.Length / Math.Min(12, jobKeywords.Count);
+
+            var score = Math.Clamp((requiredCoverage * 70d) + (optionalCoverage * 20d) + (keywordOverlap * 10d), 0d, 100d);
+            var analysis = analysisByCandidateId[candidate.Id];
+
+            results.Add(new MatchResult
             {
-                var resumeNormalized = TextProcessing.NormalizeText(candidate.ResumeText);
-                var matchedRequired = requiredSkills
-                    .Where(skill => ContainsSkill(resumeNormalized, skill))
-                    .ToArray();
-                var missingRequired = requiredSkills
-                    .Except(matchedRequired, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-                var matchedOptional = optionalSkills
-                    .Where(skill => ContainsSkill(resumeNormalized, skill))
-                    .ToArray();
-
-                var resumeKeywords = TextProcessing.TokenizeKeywords(candidate.ResumeText);
-                var overlappingKeywords = jobKeywords
-                    .Intersect(resumeKeywords, StringComparer.OrdinalIgnoreCase)
-                    .Take(8)
-                    .ToArray();
-
-                var requiredCoverage = requiredSkills.Count == 0
-                    ? 1.0
-                    : (double)matchedRequired.Length / requiredSkills.Count;
-                var optionalCoverage = optionalSkills.Count == 0
-                    ? 0.0
-                    : (double)matchedOptional.Length / optionalSkills.Count;
-                var keywordOverlap = jobKeywords.Count == 0
-                    ? 0.0
-                    : (double)overlappingKeywords.Length / Math.Min(12, jobKeywords.Count);
-
-                var score = Math.Clamp((requiredCoverage * 70d) + (optionalCoverage * 20d) + (keywordOverlap * 10d), 0d, 100d);
-
-                if (score < 45d)
-                {
-                    continue;
-                }
-
-                var analysis = analysisByCandidateId[candidate.Id];
-
-                results.Add(new MatchResult
-                {
-                    JobPostingId = job.Id,
-                    CandidateId = candidate.Id,
-                    ResumeAnalysisId = analysis.Id,
-                    MatchScore = Math.Round(score, 1),
-                    MatchedSkills = string.Join(", ", matchedRequired.Concat(matchedOptional).Distinct(StringComparer.OrdinalIgnoreCase)),
-                    MissingSkills = string.Join(", ", missingRequired),
-                    TopOverlappingKeywords = string.Join(", ", overlappingKeywords),
-                    GeneratedUtc = now.AddDays(-1)
-                });
-            }
+                JobPostingId = job.Id,
+                CandidateId = candidate.Id,
+                ResumeAnalysisId = analysis.Id,
+                MatchScore = Math.Round(score, 1),
+                MatchedSkills = string.Join(", ", matchedRequired.Concat(matchedOptional).Distinct(StringComparer.OrdinalIgnoreCase)),
+                MissingSkills = string.Join(", ", missingRequired),
+                TopOverlappingKeywords = string.Join(", ", overlappingKeywords),
+                GeneratedUtc = now.AddDays(-1)
+            });
         }
 
         return results
@@ -347,5 +418,136 @@ public static class InitialDataSeeder
     {
         var normalizedSkill = TextProcessing.NormalizeText(skill);
         return normalizedResumeText.Contains(normalizedSkill, StringComparison.Ordinal);
+    }
+
+    private static async Task BackfillApplicationFlowDataAsync(
+        IServiceProvider services,
+        HireLensDbContext dbContext,
+        ILogger logger)
+    {
+        var jobs = await dbContext.JobPostings
+            .AsNoTracking()
+            .OrderByDescending(x => x.UpdatedUtc)
+            .Select(x => new { x.Id, x.Title })
+            .ToListAsync();
+
+        var candidates = await dbContext.Candidates
+            .AsNoTracking()
+            .OrderBy(x => x.CreatedUtc)
+            .Select(x => new { x.Id })
+            .ToListAsync();
+
+        if (jobs.Count == 0 || candidates.Count == 0)
+        {
+            logger.LogInformation("Application flow backfill skipped because jobs or candidates are missing.");
+            return;
+        }
+
+        var existingApplications = await dbContext.JobApplications
+            .AsNoTracking()
+            .Select(x => new { x.CandidateId })
+            .ToListAsync();
+
+        var candidateIdsWithApplication = existingApplications
+            .Select(x => x.CandidateId)
+            .ToHashSet();
+
+        var candidatesWithoutApplication = candidates
+            .Where(x => !candidateIdsWithApplication.Contains(x.Id))
+            .ToList();
+
+        if (candidatesWithoutApplication.Count > 0)
+        {
+            var newApplications = new List<JobApplication>(candidatesWithoutApplication.Count);
+            for (var i = 0; i < candidatesWithoutApplication.Count; i++)
+            {
+                var candidate = candidatesWithoutApplication[i];
+                var assignedJob = jobs[i % jobs.Count];
+                var now = DateTime.UtcNow;
+
+                newApplications.Add(new JobApplication
+                {
+                    JobPostingId = assignedJob.Id,
+                    CandidateId = candidate.Id,
+                    Status = ApplicationStatus.Submitted,
+                    AppliedUtc = now,
+                    UpdatedUtc = now
+                });
+            }
+
+            dbContext.JobApplications.AddRange(newApplications);
+            await dbContext.SaveChangesAsync();
+
+            logger.LogInformation(
+                "Backfilled {Count} job applications for candidates missing application records.",
+                newApplications.Count);
+        }
+
+        var matchingService = services.GetRequiredService<IMatchingService>();
+        var resumeAnalysisService = services.GetRequiredService<IResumeAnalysisService>();
+
+        var applications = await dbContext.JobApplications
+            .OrderBy(x => x.AppliedUtc)
+            .ToListAsync();
+
+        var scoredCount = 0;
+        var failedCount = 0;
+
+        foreach (var application in applications)
+        {
+            var hasMatch = await dbContext.MatchResults
+                .AsNoTracking()
+                .AnyAsync(x => x.JobPostingId == application.JobPostingId && x.CandidateId == application.CandidateId);
+
+            if (hasMatch)
+            {
+                if (application.Status != ApplicationStatus.Scored)
+                {
+                    application.Status = ApplicationStatus.Scored;
+                    application.UpdatedUtc = DateTime.UtcNow;
+                }
+
+                scoredCount++;
+                continue;
+            }
+
+            try
+            {
+                await resumeAnalysisService.AnalyzeCandidateAsync(application.CandidateId);
+                application.Status = ApplicationStatus.Analyzed;
+                application.UpdatedUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+
+                await matchingService.MatchForJobAsync(
+                    new MatchCandidatesRequest
+                    {
+                        JobPostingId = application.JobPostingId,
+                        CandidateIds = [application.CandidateId]
+                    });
+
+                application.Status = ApplicationStatus.Scored;
+                application.UpdatedUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+                scoredCount++;
+            }
+            catch (Exception ex)
+            {
+                application.Status = ApplicationStatus.Failed;
+                application.UpdatedUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+                failedCount++;
+
+                logger.LogWarning(
+                    ex,
+                    "Backfill failed for candidate {CandidateId} on job {JobPostingId}.",
+                    application.CandidateId,
+                    application.JobPostingId);
+            }
+        }
+
+        logger.LogInformation(
+            "Application flow backfill completed. Scored={ScoredCount}, Failed={FailedCount}.",
+            scoredCount,
+            failedCount);
     }
 }

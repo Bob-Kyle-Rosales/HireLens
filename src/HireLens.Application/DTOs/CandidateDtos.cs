@@ -7,7 +7,11 @@ public sealed record CandidateDto(
     string FullName,
     string Email,
     string ResumeFileName,
-    DateTime CreatedUtc);
+    DateTime CreatedUtc,
+    Guid? LatestAppliedJobPostingId,
+    string? LatestAppliedJobTitle,
+    string? LatestApplicationStatus,
+    DateTime? LatestAppliedUtc);
 
 public sealed class CandidateUploadRequest
 {
@@ -28,6 +32,8 @@ public sealed class CandidateUploadRequest
 
     [Required]
     public byte[] ResumeContent { get; set; } = [];
+
+    public Guid JobPostingId { get; set; }
 
     public string UploadedByUserId { get; set; } = string.Empty;
 }

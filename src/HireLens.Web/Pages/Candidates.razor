@@ -3,7 +3,9 @@
 @using System.Security.Claims
 @using HireLens.Application.DTOs
 @using HireLens.Application.Interfaces
+@using Microsoft.AspNetCore.Components
 @inject ICandidateService CandidateService
+@inject IJobPostingService JobPostingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISnackbar Snackbar
 
@@ -40,6 +42,18 @@
                           Variant="Variant.Outlined"
                           Class="mt-3"
                           @bind-Value="_upload.Email" />
+
+            <MudSelect T="Guid?"
+                       Label="Target Job Role"
+                       Variant="Variant.Outlined"
+                       Class="mt-3"
+                       @bind-Value="_upload.JobPostingId">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">Select job role</MudSelectItem>
+                @foreach (var job in _jobs)
+                {
+                    <MudSelectItem T="Guid?" Value="@job.Id">@job.Title</MudSelectItem>
+                }
+            </MudSelect>
 
             <MudPaper Class="pa-3 mt-3 hl-file-box" Outlined="true">
                 <MudText Typo="Typo.caption">Resume (.pdf or .txt, max 10 MB)</MudText>
@@ -81,12 +95,20 @@
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Email</MudTh>
+                    <MudTh>Applied Job</MudTh>
+                    <MudTh>Status</MudTh>
                     <MudTh>Resume</MudTh>
                     <MudTh>Uploaded</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.FullName</MudTd>
                     <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Applied Job">@(context.LatestAppliedJobTitle ?? "-")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip Variant="Variant.Outlined" Color="@GetApplicationStatusColor(context.LatestApplicationStatus)">
+                            @(context.LatestApplicationStatus ?? "Unassigned")
+                        </MudChip>
+                    </MudTd>
                     <MudTd DataLabel="Resume">@context.ResumeFileName</MudTd>
                     <MudTd DataLabel="Uploaded">@context.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
                 </RowTemplate>
@@ -101,8 +123,12 @@
 @code {
     private const long MaxResumeSizeBytes = 10 * 1024 * 1024;
 
+    [SupplyParameterFromQuery(Name = "jobId")]
+    public Guid? JobId { get; set; }
+
     private readonly UploadFormModel _upload = new();
     private List<CandidateDto> _candidates = [];
+    private List<JobPostingDto> _jobs = [];
     private IBrowserFile? _selectedFile;
     private string _selectedFileName = string.Empty;
     private bool _loading;
@@ -116,7 +142,36 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadJobsAsync();
+        ApplySelectedJobFromQuery();
         await ReloadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplySelectedJobFromQuery();
+    }
+
+    private async Task LoadJobsAsync()
+    {
+        try
+        {
+            _jobs = (await JobPostingService.GetAllAsync())
+                .OrderBy(x => x.Title)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load jobs: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ApplySelectedJobFromQuery()
+    {
+        if (JobId is not null && _jobs.Any(x => x.Id == JobId.Value))
+        {
+            _upload.JobPostingId = JobId.Value;
+        }
     }
 
     private async Task ReloadAsync()
@@ -155,6 +210,12 @@
             return;
         }
 
+        if (_upload.JobPostingId is null)
+        {
+            Snackbar.Add("Please select a target job role.", Severity.Warning);
+            return;
+        }
+
         if (_selectedFile is null)
         {
             Snackbar.Add("Please select a resume file.", Severity.Warning);
@@ -187,6 +248,7 @@
                     ? "application/octet-stream"
                     : _selectedFile.ContentType,
                 ResumeContent = memoryStream.ToArray(),
+                JobPostingId = _upload.JobPostingId.Value,
                 UploadedByUserId = userId
             };
 
@@ -209,18 +271,35 @@
     {
         _upload.FullName = string.Empty;
         _upload.Email = string.Empty;
+        _upload.JobPostingId = JobId is not null && _jobs.Any(x => x.Id == JobId.Value) ? JobId : null;
         _selectedFile = null;
         _selectedFileName = string.Empty;
     }
 
     private bool IsMatch(CandidateDto item)
     {
-        return Contains(item.FullName) || Contains(item.Email) || Contains(item.ResumeFileName);
+        return Contains(item.FullName)
+               || Contains(item.Email)
+               || Contains(item.ResumeFileName)
+               || Contains(item.LatestAppliedJobTitle)
+               || Contains(item.LatestApplicationStatus);
     }
 
-    private bool Contains(string value)
+    private bool Contains(string? value)
     {
-        return value.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+        return !string.IsNullOrWhiteSpace(value)
+               && value.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Color GetApplicationStatusColor(string? status)
+    {
+        return status switch
+        {
+            "Scored" => Color.Success,
+            "Analyzed" => Color.Info,
+            "Failed" => Color.Error,
+            _ => Color.Default
+        };
     }
 
     private sealed class UploadFormModel
@@ -230,5 +309,7 @@
 
         [Required]
         public string Email { get; set; } = string.Empty;
+
+        public Guid? JobPostingId { get; set; }
     }
 }
