@@ -13,11 +13,18 @@ HireLens is currently in a backend-first phase built on .NET 8 with REST APIs, I
 
 - Identity-based authentication endpoints at `/api/auth/*`
 - Role policies (`RecruiterOrAdmin`, `AdminOnly`)
+- Auth and admin endpoint rate limiting
 - Jobs REST API (`/api/jobs`)
 - Candidates REST API (`/api/candidates`, `/api/candidates/upload`)
+- Resume analysis API (`/api/analyses/*`)
+- Matching API (`/api/matches/*`)
+- Model management and training API (`/api/models/*`)
 - Resume text extraction for `.pdf` and `.txt`
-- Global exception middleware
+- Correlation ID middleware (`X-Correlation-ID`)
+- Global exception middleware with `ProblemDetails` JSON for API errors
 - Automatic migration apply on startup + role seeding
+- Automated integration tests (`tests/HireLens.Web.IntegrationTests`)
+- CI workflow (`.github/workflows/ci.yml`)
 
 ## Project Structure
 
@@ -34,6 +41,9 @@ Edit `src/HireLens.Web/appsettings.json`:
 - `ConnectionStrings:DefaultConnection`: database connection string
 - `SeedAdmin:Email` / `SeedAdmin:Password`: optional initial admin account
 - `SeedData:Enabled`: seed demo jobs/candidates/analyses/matches on startup when DB is empty
+- `ML:ModelDirectory`: local directory used for persisted ML.NET model files
+- `ML:Training:MinLabeledResumes`: minimum labeled resumes required for training
+- `ML:Training:MinDistinctCategories`: minimum category count required for training
 
 ## Migrations
 
@@ -85,6 +95,20 @@ docker compose up --build
 - Swagger (Development): `http://localhost:8080/swagger`
 - SQL Server from host: `localhost,14333`
 
+## Tests
+
+Run integration tests:
+
+```powershell
+dotnet test tests/HireLens.Web.IntegrationTests/HireLens.Web.IntegrationTests.csproj
+```
+
+Run ML API smoke tests against a running app:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/test-ml-api.ps1
+```
+
 Stop containers:
 
 ```powershell
@@ -97,7 +121,6 @@ Stop and remove DB volume:
 docker compose down -v
 ```
 
-## Next Phases
+## CI
 
-- Add ML.NET analysis and matching engine
-- Add UI layer after backend and ML APIs are finalized
+GitHub Actions CI runs restore, build, and integration tests on push/PR.
