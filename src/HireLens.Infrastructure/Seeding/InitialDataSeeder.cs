@@ -39,6 +39,9 @@ public static class InitialDataSeeder
             ModelType = "ResumeCategoryClassifier",
             StoragePath = "models/resume-category-v1.zip",
             Accuracy = 0.84,
+            TrainingSampleCount = 6,
+            TrainingCategoryCount = 4,
+            TrainingCategoryDistribution = "{\"IT\":2,\"Data/ML\":2,\"Frontend\":1,\"HR\":1}",
             IsActive = true,
             TrainedUtc = now.AddDays(-3)
         };

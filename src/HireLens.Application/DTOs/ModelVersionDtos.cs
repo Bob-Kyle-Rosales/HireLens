@@ -8,6 +8,9 @@ public sealed record ModelVersionDto(
     string ModelType,
     string StoragePath,
     double Accuracy,
+    int TrainingSampleCount,
+    int TrainingCategoryCount,
+    string TrainingCategoryDistribution,
     bool IsActive,
     DateTime TrainedUtc);
 
@@ -27,6 +30,15 @@ public sealed class CreateModelVersionRequest
 
     [Range(0, 1)]
     public double Accuracy { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int TrainingSampleCount { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int TrainingCategoryCount { get; set; }
+
+    [StringLength(4000)]
+    public string TrainingCategoryDistribution { get; set; } = "{}";
 
     public bool IsActive { get; set; }
 }

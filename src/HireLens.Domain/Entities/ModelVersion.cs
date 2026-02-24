@@ -7,6 +7,9 @@ public class ModelVersion
     public string ModelType { get; set; } = string.Empty;
     public string StoragePath { get; set; } = string.Empty;
     public double Accuracy { get; set; }
+    public int TrainingSampleCount { get; set; }
+    public int TrainingCategoryCount { get; set; }
+    public string TrainingCategoryDistribution { get; set; } = "{}";
     public bool IsActive { get; set; }
     public DateTime TrainedUtc { get; set; } = DateTime.UtcNow;
 }

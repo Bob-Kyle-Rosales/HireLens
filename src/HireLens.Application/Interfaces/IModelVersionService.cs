@@ -9,4 +9,5 @@ public interface IModelVersionService
     Task<ModelVersionDto?> GetActiveAsync(string modelType, CancellationToken cancellationToken = default);
     Task<ModelVersionDto> CreateAsync(CreateModelVersionRequest request, CancellationToken cancellationToken = default);
     Task<bool> SetActiveAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ModelVersionDto> TrainResumeCategoryModelAsync(CancellationToken cancellationToken = default);
 }

@@ -10,10 +10,12 @@ namespace HireLens.Infrastructure.Services;
 internal sealed class CandidateService(
     HireLensDbContext dbContext,
     IResumeTextExtractor resumeTextExtractor,
+    IResumeAnalysisService resumeAnalysisService,
     ILogger<CandidateService> logger) : ICandidateService
 {
     private readonly HireLensDbContext _dbContext = dbContext;
     private readonly IResumeTextExtractor _resumeTextExtractor = resumeTextExtractor;
+    private readonly IResumeAnalysisService _resumeAnalysisService = resumeAnalysisService;
     private readonly ILogger<CandidateService> _logger = logger;
 
     public async Task<IReadOnlyList<CandidateDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -66,6 +68,15 @@ internal sealed class CandidateService(
 
         _dbContext.Candidates.Add(candidate);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _resumeAnalysisService.AnalyzeCandidateAsync(candidate.Id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Candidate {CandidateId} uploaded but automatic resume analysis failed", candidate.Id);
+        }
 
         _logger.LogInformation("Candidate {CandidateId} uploaded", candidate.Id);
         return MapToDto(candidate);

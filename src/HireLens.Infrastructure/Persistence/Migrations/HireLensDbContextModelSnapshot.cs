@@ -192,6 +192,17 @@ namespace HireLens.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int>("TrainingCategoryCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TrainingCategoryDistribution")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("TrainingSampleCount")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("TrainedUtc")
                         .HasColumnType("datetime2");
 

@@ -45,6 +45,7 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
             entity.Property(x => x.Version).HasMaxLength(100).IsRequired();
             entity.Property(x => x.ModelType).HasMaxLength(100).IsRequired();
             entity.Property(x => x.StoragePath).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.TrainingCategoryDistribution).HasMaxLength(4000).IsRequired();
             entity.HasIndex(x => new { x.ModelType, x.Version }).IsUnique();
             entity.HasIndex(x => new { x.ModelType, x.IsActive });
             entity.HasIndex(x => x.TrainedUtc);

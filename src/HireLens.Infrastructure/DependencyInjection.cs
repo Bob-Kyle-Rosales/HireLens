@@ -30,6 +30,9 @@ public static class DependencyInjection
 
         services.AddScoped<IResumeTextExtractor, ResumeTextExtractor>();
         services.AddScoped<IJobPostingService, JobPostingService>();
+        services.AddScoped<IModelVersionService, ModelVersionService>();
+        services.AddScoped<IResumeAnalysisService, ResumeAnalysisService>();
+        services.AddScoped<IMatchingService, MatchingService>();
         services.AddScoped<ICandidateService, CandidateService>();
 
         return services;
