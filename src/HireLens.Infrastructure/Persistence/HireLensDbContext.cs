@@ -9,6 +9,7 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
 {
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
     public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<JobApplication> JobApplications => Set<JobApplication>();
     public DbSet<ResumeAnalysis> ResumeAnalyses => Set<ResumeAnalysis>();
     public DbSet<MatchResult> MatchResults => Set<MatchResult>();
     public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
@@ -38,6 +39,23 @@ public class HireLensDbContext(DbContextOptions<HireLensDbContext> options) : Id
             entity.Property(x => x.ResumeText).HasMaxLength(200_000).IsRequired();
             entity.HasIndex(x => x.Email);
             entity.HasIndex(x => x.CreatedUtc);
+        });
+
+        builder.Entity<JobApplication>(entity =>
+        {
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.HasOne<JobPosting>()
+                .WithMany()
+                .HasForeignKey(x => x.JobPostingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Candidate>()
+                .WithMany()
+                .HasForeignKey(x => x.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.JobPostingId);
+            entity.HasIndex(x => x.CandidateId);
+            entity.HasIndex(x => x.AppliedUtc);
+            entity.HasIndex(x => new { x.JobPostingId, x.CandidateId }).IsUnique();
         });
 
         builder.Entity<ModelVersion>(entity =>

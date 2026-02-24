@@ -119,6 +119,43 @@ namespace HireLens.Infrastructure.Persistence.Migrations
                     b.ToTable("JobPostings");
                 });
 
+            modelBuilder.Entity("HireLens.Domain.Entities.JobApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AppliedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("JobPostingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppliedUtc");
+
+                    b.HasIndex("CandidateId");
+
+                    b.HasIndex("JobPostingId");
+
+                    b.HasIndex("JobPostingId", "CandidateId")
+                        .IsUnique();
+
+                    b.ToTable("JobApplications");
+                });
+
             modelBuilder.Entity("HireLens.Domain.Entities.MatchResult", b =>
                 {
                     b.Property<Guid>("Id")
@@ -478,6 +515,21 @@ namespace HireLens.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ResumeAnalysisId")
                         .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("HireLens.Domain.Entities.JobApplication", b =>
+                {
+                    b.HasOne("HireLens.Domain.Entities.Candidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HireLens.Domain.Entities.JobPosting", null)
+                        .WithMany()
+                        .HasForeignKey("JobPostingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HireLens.Domain.Entities.ResumeAnalysis", b =>
