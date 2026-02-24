@@ -13,6 +13,18 @@ namespace HireLens.Web.Controllers;
 public sealed class CandidatesController(ICandidateService candidateService) : ControllerBase
 {
     private const long MaxResumeSizeBytes = 10 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf",
+        ".txt"
+    };
+
+    private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf",
+        "text/plain",
+        "application/octet-stream"
+    };
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CandidateDto>>> GetAll(CancellationToken cancellationToken)
@@ -47,6 +59,27 @@ public sealed class CandidatesController(ICandidateService candidateService) : C
             return BadRequest("Resume file exceeds 10 MB limit.");
         }
 
+        var sanitizedFileName = Path.GetFileName(form.Resume.FileName).Trim();
+        if (string.IsNullOrWhiteSpace(sanitizedFileName))
+        {
+            return BadRequest("Resume file name is invalid.");
+        }
+
+        var extension = Path.GetExtension(sanitizedFileName);
+        if (!AllowedExtensions.Contains(extension))
+        {
+            return BadRequest("Unsupported file format. Please upload a PDF or text file.");
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(form.Resume.ContentType)
+            ? "application/octet-stream"
+            : form.Resume.ContentType.Trim();
+
+        if (!AllowedContentTypes.Contains(contentType))
+        {
+            return BadRequest("Unsupported content type for resume upload.");
+        }
+
         await using var stream = form.Resume.OpenReadStream();
         await using var memory = new MemoryStream();
         await stream.CopyToAsync(memory, cancellationToken);
@@ -57,8 +90,8 @@ public sealed class CandidatesController(ICandidateService candidateService) : C
         {
             FullName = form.FullName.Trim(),
             Email = form.Email.Trim(),
-            ResumeFileName = form.Resume.FileName,
-            ResumeContentType = string.IsNullOrWhiteSpace(form.Resume.ContentType) ? "application/octet-stream" : form.Resume.ContentType,
+            ResumeFileName = sanitizedFileName,
+            ResumeContentType = contentType,
             ResumeContent = memory.ToArray(),
             JobPostingId = form.JobPostingId,
             UploadedByUserId = userId

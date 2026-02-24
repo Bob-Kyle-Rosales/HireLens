@@ -7,6 +7,7 @@ using HireLens.Infrastructure.Seeding;
 using HireLens.Web.Middleware;
 using HireLens.Web.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using MudBlazor.Services;
@@ -80,6 +81,17 @@ builder.Services.AddAuthentication(options =>
         options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     })
     .AddIdentityCookies();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "__Host-HireLens.Auth";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.None
+        : CookieSecurePolicy.Always;
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+});
 
 builder.Services.AddAuthorization(options =>
 {
@@ -124,6 +136,7 @@ else
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseRateLimiter();
 app.UseHttpsRedirection();
 app.UseStaticFiles();

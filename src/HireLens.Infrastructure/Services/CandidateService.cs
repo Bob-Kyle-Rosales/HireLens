@@ -15,6 +15,12 @@ internal sealed class CandidateService(
     IMatchingService matchingService,
     ILogger<CandidateService> logger) : ICandidateService
 {
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf",
+        ".txt"
+    };
+
     private readonly HireLensDbContext _dbContext = dbContext;
     private readonly IResumeTextExtractor _resumeTextExtractor = resumeTextExtractor;
     private readonly IResumeAnalysisService _resumeAnalysisService = resumeAnalysisService;
@@ -61,6 +67,22 @@ internal sealed class CandidateService(
             throw new InvalidOperationException("Resume file cannot be empty.");
         }
 
+        var sanitizedFileName = Path.GetFileName(request.ResumeFileName).Trim();
+        if (string.IsNullOrWhiteSpace(sanitizedFileName))
+        {
+            throw new InvalidOperationException("Resume file name is invalid.");
+        }
+
+        var extension = Path.GetExtension(sanitizedFileName);
+        if (!AllowedExtensions.Contains(extension))
+        {
+            throw new InvalidOperationException("Unsupported file format. Please upload a PDF or text file.");
+        }
+
+        var normalizedContentType = string.IsNullOrWhiteSpace(request.ResumeContentType)
+            ? "application/octet-stream"
+            : request.ResumeContentType.Trim();
+
         var job = await _dbContext.JobPostings
             .AsNoTracking()
             .Where(x => x.Id == request.JobPostingId)
@@ -70,8 +92,8 @@ internal sealed class CandidateService(
 
         var resumeText = await _resumeTextExtractor.ExtractAsync(
             request.ResumeContent,
-            request.ResumeFileName,
-            request.ResumeContentType,
+            sanitizedFileName,
+            normalizedContentType,
             cancellationToken);
 
         if (string.IsNullOrWhiteSpace(resumeText))
@@ -85,8 +107,8 @@ internal sealed class CandidateService(
             UploadedByUserId = request.UploadedByUserId,
             FullName = request.FullName.Trim(),
             Email = request.Email.Trim(),
-            ResumeFileName = request.ResumeFileName,
-            ResumeContentType = request.ResumeContentType,
+            ResumeFileName = sanitizedFileName,
+            ResumeContentType = normalizedContentType,
             ResumeText = resumeText,
             CreatedUtc = now
         };
