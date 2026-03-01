@@ -39,6 +39,7 @@ artifacts/
 # Runtime / generated
 ml-models/
 *.pid
+.env
 
 # OS files
 .DS_Store
