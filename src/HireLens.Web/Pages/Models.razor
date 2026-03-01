@@ -1,7 +1,10 @@
 @page "/models"
 @attribute [Authorize(Policy = "AdminOnly")]
+@using HireLens.Application.Interfaces
 @using HireLens.Web.Services
 @inject IDashboardReadService DashboardReadService
+@inject IModelVersionService ModelVersionService
+@inject IResumeAnalysisService ResumeAnalysisService
 @inject ISnackbar Snackbar
 
 <PageTitle>Models</PageTitle>
@@ -24,7 +27,26 @@
 <MudPaper Class="pa-4 hl-panel">
     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
         <MudText Typo="Typo.h6" Class="hl-panel-title">Saved Models</MudText>
-        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">Refresh</MudButton>
+        <MudStack Row="true" Spacing="1">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Disabled="@(_loading || _training || _reanalyzing || _activatingModelId is not null)"
+                       OnClick="TrainResumeCategoryAsync">
+                @(_training ? "Training..." : "Train Resume Model")
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Info"
+                       Disabled="@(_loading || _training || _reanalyzing || _activatingModelId is not null)"
+                       OnClick="ReanalyzeAllCandidatesAsync">
+                @(_reanalyzing ? "Re-analyzing..." : "Re-analyze Candidates")
+            </MudButton>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       Disabled="@(_loading || _training || _reanalyzing || _activatingModelId is not null)"
+                       OnClick="LoadAsync">
+                Refresh
+            </MudButton>
+        </MudStack>
     </MudStack>
 
     <MudDivider Class="my-3" />
@@ -37,6 +59,7 @@
             <MudTh>Status</MudTh>
             <MudTh>Trained</MudTh>
             <MudTh>Path</MudTh>
+            <MudTh>Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Model Type">@context.ModelType</MudTd>
@@ -53,6 +76,15 @@
                     <MudText Typo="Typo.caption">@Truncate(context.StoragePath, 32)</MudText>
                 </MudTooltip>
             </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
+                           Color="Color.Success"
+                           Disabled="@(_loading || _training || _reanalyzing || _activatingModelId is not null || context.IsActive)"
+                           OnClick="@(() => ActivateModelAsync(context.Id))">
+                    @(_activatingModelId == context.Id ? "Activating..." : "Set Active")
+                </MudButton>
+            </MudTd>
         </RowTemplate>
         <NoRecordsContent>
             <MudText Typo="Typo.body2">No model versions saved yet.</MudText>
@@ -63,6 +95,9 @@
 @code {
     private List<ModelVersionRowDto> _rows = [];
     private bool _loading;
+    private bool _training;
+    private bool _reanalyzing;
+    private Guid? _activatingModelId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,6 +118,89 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task TrainResumeCategoryAsync()
+    {
+        if (_training || _loading || _reanalyzing || _activatingModelId is not null)
+        {
+            return;
+        }
+
+        _training = true;
+
+        try
+        {
+            var trained = await ModelVersionService.TrainResumeCategoryModelAsync();
+            Snackbar.Add(
+                $"Model trained: {trained.Version} ({trained.Accuracy:P1} accuracy).",
+                Severity.Success);
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Model training failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _training = false;
+        }
+    }
+
+    private async Task ReanalyzeAllCandidatesAsync()
+    {
+        if (_reanalyzing || _loading || _training || _activatingModelId is not null)
+        {
+            return;
+        }
+
+        _reanalyzing = true;
+
+        try
+        {
+            var analyzedCount = await ResumeAnalysisService.AnalyzeAllCandidatesAsync();
+            Snackbar.Add($"Re-analysis complete: {analyzedCount} candidate(s) processed.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Re-analysis failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _reanalyzing = false;
+        }
+    }
+
+    private async Task ActivateModelAsync(Guid modelVersionId)
+    {
+        if (_loading || _training || _reanalyzing || _activatingModelId is not null)
+        {
+            return;
+        }
+
+        _activatingModelId = modelVersionId;
+
+        try
+        {
+            var activated = await ModelVersionService.SetActiveAsync(modelVersionId);
+            if (!activated)
+            {
+                Snackbar.Add("Model version not found.", Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add("Model activated.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Activation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _activatingModelId = null;
         }
     }
 
