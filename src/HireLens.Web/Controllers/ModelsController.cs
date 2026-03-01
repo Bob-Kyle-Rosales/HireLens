@@ -1,5 +1,6 @@
 using HireLens.Application.DTOs;
 using HireLens.Application.Interfaces;
+using HireLens.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -12,7 +13,8 @@ namespace HireLens.Web.Controllers;
 [EnableRateLimiting("admin-heavy")]
 public sealed class ModelsController(
     IModelVersionService modelVersionService,
-    IResumeAnalysisService resumeAnalysisService) : ControllerBase
+    IResumeAnalysisService resumeAnalysisService,
+    IAdminAuditService adminAuditService) : ControllerBase
 {
     private const string ResumeCategoryModelType = "ResumeCategoryClassifier";
 
@@ -43,8 +45,22 @@ public sealed class ModelsController(
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ModelVersionDto>> TrainResumeCategoryModel(CancellationToken cancellationToken)
     {
-        var modelVersion = await modelVersionService.TrainResumeCategoryModelAsync(cancellationToken);
-        return Ok(modelVersion);
+        try
+        {
+            var modelVersion = await modelVersionService.TrainResumeCategoryModelAsync(cancellationToken);
+            adminAuditService.Log(
+                HttpContext,
+                action: "Model.TrainResumeCategory",
+                outcome: "Success",
+                details: $"modelVersionId={modelVersion.Id};version={modelVersion.Version};accuracy={modelVersion.Accuracy:0.0000}");
+
+            return Ok(modelVersion);
+        }
+        catch (Exception ex)
+        {
+            adminAuditService.Log(HttpContext, "Model.TrainResumeCategory", "Failed", ex.Message);
+            throw;
+        }
     }
 
     [HttpPost("{id:guid}/activate")]
@@ -52,15 +68,47 @@ public sealed class ModelsController(
     public async Task<IActionResult> SetActive(Guid id, CancellationToken cancellationToken)
     {
         var activated = await modelVersionService.SetActiveAsync(id, cancellationToken);
-        return activated ? NoContent() : NotFound();
+
+        if (!activated)
+        {
+            adminAuditService.Log(
+                HttpContext,
+                action: "Model.ActivateVersion",
+                outcome: "NotFound",
+                details: $"modelVersionId={id}");
+
+            return NotFound();
+        }
+
+        adminAuditService.Log(
+            HttpContext,
+            action: "Model.ActivateVersion",
+            outcome: "Success",
+            details: $"modelVersionId={id}");
+
+        return NoContent();
     }
 
     [HttpPost("reanalyze-candidates")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ReanalyzeCandidatesResponse>> ReanalyzeCandidates(CancellationToken cancellationToken)
     {
-        var analyzedCount = await resumeAnalysisService.AnalyzeAllCandidatesAsync(cancellationToken);
-        return Ok(new ReanalyzeCandidatesResponse(analyzedCount));
+        try
+        {
+            var analyzedCount = await resumeAnalysisService.AnalyzeAllCandidatesAsync(cancellationToken);
+            adminAuditService.Log(
+                HttpContext,
+                action: "Model.ReanalyzeCandidates",
+                outcome: "Success",
+                details: $"analyzedCount={analyzedCount}");
+
+            return Ok(new ReanalyzeCandidatesResponse(analyzedCount));
+        }
+        catch (Exception ex)
+        {
+            adminAuditService.Log(HttpContext, "Model.ReanalyzeCandidates", "Failed", ex.Message);
+            throw;
+        }
     }
 }
 

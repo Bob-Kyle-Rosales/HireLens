@@ -25,6 +25,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMudServices();
 builder.Services.AddScoped<IDashboardReadService, DashboardReadService>();
+builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
