@@ -1,7 +1,29 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(Program).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(Shared.MainLayout)" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Shared.MainLayout)">
+                <Authorizing>
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Filled">
+                            Checking your access...
+                        </MudAlert>
+                    </MudContainer>
+                </Authorizing>
+                <NotAuthorized Context="authState">
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+                            @if (authState.User.Identity?.IsAuthenticated ?? false)
+                            {
+                                <span>Your account does not have permission to view this page.</span>
+                            }
+                            else
+                            {
+                                <span>Authentication required. Sign in via the auth endpoint to continue.</span>
+                            }
+                        </MudAlert>
+                    </MudContainer>
+                </NotAuthorized>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>

@@ -1,4 +1,5 @@
 @page "/models"
+@attribute [Authorize(Policy = "AdminOnly")]
 @using HireLens.Web.Services
 @inject IDashboardReadService DashboardReadService
 @inject ISnackbar Snackbar

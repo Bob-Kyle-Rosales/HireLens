@@ -1,4 +1,5 @@
 @page "/"
+@attribute [Authorize(Policy = "RecruiterOrAdmin")]
 @using HireLens.Web.Services
 @inject IDashboardReadService DashboardReadService
 @inject ISnackbar Snackbar
