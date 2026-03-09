@@ -11,7 +11,11 @@ public sealed record CandidateDto(
     Guid? LatestAppliedJobPostingId,
     string? LatestAppliedJobTitle,
     string? LatestApplicationStatus,
-    DateTime? LatestAppliedUtc);
+    DateTime? LatestAppliedUtc,
+    string? LatestPredictedCategory,
+    double? LatestConfidenceScore,
+    IReadOnlyList<string> LatestExtractedSkills,
+    DateTime? LatestAnalyzedUtc);
 
 public sealed class CandidateUploadRequest
 {
