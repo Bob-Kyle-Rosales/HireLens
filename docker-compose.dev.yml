@@ -1,0 +1,21 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: src/HireLens.Web/Dockerfile
+      target: build
+    working_dir: /src
+    command: dotnet watch --project src/HireLens.Web/HireLens.Web.csproj run --urls=http://0.0.0.0:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+    volumes:
+      - ./:/src
+      - nuget_cache:/root/.nuget/packages
+      - dotnet_tools:/root/.dotnet/tools
+
+volumes:
+  nuget_cache:
+  dotnet_tools:

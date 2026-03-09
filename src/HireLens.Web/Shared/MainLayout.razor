@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 
 <MudThemeProvider Theme="@_theme" />
+<MudBreakpointProvider OnBreakpointChanged="HandleBreakpointChanged" />
 
 <MudLayout Class="hl-shell">
     <MudAppBar Elevation="0" Dense="true" Class="hl-appbar">
@@ -37,8 +38,8 @@
         </AuthorizeView>
     </MudAppBar>
 
-    <MudDrawer Open="@_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1" Class="hl-drawer">
-        <NavMenu />
+    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" Elevation="1" Class="hl-drawer">
+        <NavMenu OnNavigate="HandleNavigation" />
     </MudDrawer>
 
     <MudMainContent Class="hl-main">
@@ -81,4 +82,19 @@
     {
         _drawerOpen = !_drawerOpen;
     }
+
+    private void HandleBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint is Breakpoint.Xs or Breakpoint.Sm;
+    }
+
+    private void HandleNavigation()
+    {
+        if (_isMobile)
+        {
+            _drawerOpen = false;
+        }
+    }
+
+    private bool _isMobile;
 }

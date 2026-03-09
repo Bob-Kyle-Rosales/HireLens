@@ -97,6 +97,20 @@ docker compose up --build
 - Swagger (Development): `http://localhost:8080/swagger`
 - SQL Server from host: `localhost,14333`
 
+### Docker Dev Hot Reload (No Rebuild Per Code Change)
+
+Use the dev override file to run `dotnet watch` with a bind-mounted source tree:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+In this mode:
+
+- `.cs`, `.razor`, `.css`, and other source edits are detected and reloaded automatically.
+- You usually do **not** need `--build` again for normal code changes.
+- Rebuild/restart is still needed when Dockerfile/compose/env settings change significantly.
+
 ## Tests
 
 Run integration tests:

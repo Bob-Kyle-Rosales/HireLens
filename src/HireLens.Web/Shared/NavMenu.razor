@@ -7,31 +7,41 @@
 
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard" OnClick="HandleNavigate">
                 Dashboard
             </MudNavLink>
-            <MudNavLink Href="/jobs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">
+            <MudNavLink Href="/jobs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline" OnClick="HandleNavigate">
                 Jobs
             </MudNavLink>
-            <MudNavLink Href="/candidates" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PeopleOutline">
+            <MudNavLink Href="/candidates" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PeopleOutline" OnClick="HandleNavigate">
                 Candidates
             </MudNavLink>
-            <MudNavLink Href="/matches" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart">
+            <MudNavLink Href="/matches" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart" OnClick="HandleNavigate">
                 Matches
             </MudNavLink>
             <AuthorizeView Policy="AdminOnly" Context="adminAuth">
-                <MudNavLink Href="/models" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoGraph">
+                <MudNavLink Href="/models" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoGraph" OnClick="HandleNavigate">
                     Models
                 </MudNavLink>
             </AuthorizeView>
         </Authorized>
         <NotAuthorized>
-            <MudNavLink Href="/login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login">
+            <MudNavLink Href="/login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login" OnClick="HandleNavigate">
                 Sign In
             </MudNavLink>
-            <MudNavLink Href="/register" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PersonAdd">
+            <MudNavLink Href="/register" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PersonAdd" OnClick="HandleNavigate">
                 Register
             </MudNavLink>
         </NotAuthorized>
     </AuthorizeView>
 </MudNavMenu>
+
+@code {
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+
+    private Task HandleNavigate(MouseEventArgs _)
+    {
+        return OnNavigate.InvokeAsync();
+    }
+}
