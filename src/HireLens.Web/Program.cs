@@ -84,7 +84,9 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = "__Host-HireLens.Auth";
+    options.Cookie.Name = builder.Environment.IsDevelopment()
+        ? "HireLens.Auth"
+        : "__Host-HireLens.Auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
