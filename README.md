@@ -73,6 +73,7 @@ dotnet run --project src/HireLens.Web/HireLens.Web.csproj
 Prerequisites:
 
 - Docker Desktop
+- .NET SDK 8 (`dotnet --list-sdks` should include an `8.0.x` entry)
 
 Steps:
 
