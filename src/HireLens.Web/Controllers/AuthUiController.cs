@@ -6,9 +6,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace HireLens.Web.Controllers;
 
 [Route("auth")]
-public sealed class AuthUiController(SignInManager<ApplicationUser> signInManager) : Controller
+public sealed class AuthUiController(
+    SignInManager<ApplicationUser> signInManager,
+    UserManager<ApplicationUser> userManager) : Controller
 {
     private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
+    private readonly UserManager<ApplicationUser> _userManager = userManager;
 
     [AllowAnonymous]
     [HttpPost("login")]
@@ -58,10 +61,65 @@ public sealed class AuthUiController(SignInManager<ApplicationUser> signInManage
         return LocalRedirect(returnUrl);
     }
 
+    [AllowAnonymous]
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromForm] RegisterForm form)
+    {
+        var email = form.Email.Trim();
+
+        if (string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(form.Password) ||
+            string.IsNullOrWhiteSpace(form.ConfirmPassword))
+        {
+            return Redirect(BuildRegisterRedirect("Email, password, and confirmation are required.", email, form.ReturnUrl));
+        }
+
+        if (!string.Equals(form.Password, form.ConfirmPassword, StringComparison.Ordinal))
+        {
+            return Redirect(BuildRegisterRedirect("Password and confirmation do not match.", email, form.ReturnUrl));
+        }
+
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        if (existingUser is not null)
+        {
+            return Redirect(BuildRegisterRedirect("Email is already registered.", email, form.ReturnUrl));
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        };
+
+        var createResult = await _userManager.CreateAsync(user, form.Password);
+        if (!createResult.Succeeded)
+        {
+            var errors = string.Join("; ", createResult.Errors.Select(x => x.Description));
+            return Redirect(BuildRegisterRedirect(errors, email, form.ReturnUrl));
+        }
+
+        var roleResult = await _userManager.AddToRoleAsync(user, "Recruiter");
+        if (!roleResult.Succeeded)
+        {
+            var errors = string.Join("; ", roleResult.Errors.Select(x => x.Description));
+            return Redirect(BuildRegisterRedirect(errors, email, form.ReturnUrl));
+        }
+
+        await _signInManager.SignInAsync(user, isPersistent: false);
+        return LocalRedirect(GetSafeLocalReturnUrl(form.ReturnUrl));
+    }
+
     private string BuildLoginRedirect(string error, string? returnUrl)
     {
         var safeReturnUrl = GetSafeLocalReturnUrl(returnUrl);
         return $"/login?error={Uri.EscapeDataString(error)}&returnUrl={Uri.EscapeDataString(safeReturnUrl)}";
+    }
+
+    private string BuildRegisterRedirect(string error, string? email, string? returnUrl)
+    {
+        var safeReturnUrl = GetSafeLocalReturnUrl(returnUrl);
+        return $"/register?error={Uri.EscapeDataString(error)}&email={Uri.EscapeDataString(email ?? string.Empty)}&returnUrl={Uri.EscapeDataString(safeReturnUrl)}";
     }
 
     private string GetSafeLocalReturnUrl(string? returnUrl)
@@ -84,6 +142,14 @@ public sealed class AuthUiController(SignInManager<ApplicationUser> signInManage
 
     public sealed class LogoutForm
     {
+        public string? ReturnUrl { get; set; }
+    }
+
+    public sealed class RegisterForm
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
         public string? ReturnUrl { get; set; }
     }
 }
