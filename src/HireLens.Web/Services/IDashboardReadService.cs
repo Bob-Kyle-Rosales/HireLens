@@ -1,3 +1,5 @@
+using HireLens.Application.DTOs;
+
 namespace HireLens.Web.Services;
 
 public interface IDashboardReadService
@@ -5,6 +7,12 @@ public interface IDashboardReadService
     Task<DashboardSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<JobLookupDto>> GetJobLookupAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MatchResultRowDto>> GetMatchResultsAsync(Guid? jobPostingId = null, CancellationToken cancellationToken = default);
+    Task<PagedResult<MatchResultRowDto>> GetMatchResultsPagedAsync(
+        Guid? jobPostingId = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? search = null,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ModelVersionRowDto>> GetModelVersionsAsync(CancellationToken cancellationToken = default);
 }
 

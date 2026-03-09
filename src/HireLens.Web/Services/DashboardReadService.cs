@@ -1,3 +1,4 @@
+using HireLens.Application.DTOs;
 using HireLens.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -103,6 +104,76 @@ internal sealed class DashboardReadService(IDbContextFactory<HireLensDbContext> 
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PagedResult<MatchResultRowDto>> GetMatchResultsPagedAsync(
+        Guid? jobPostingId = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var (validatedPageNumber, validatedPageSize) = ValidatePaging(pageNumber, pageSize);
+
+        var query =
+            from match in dbContext.MatchResults.AsNoTracking()
+            join job in dbContext.JobPostings.AsNoTracking()
+                on match.JobPostingId equals job.Id
+            join candidate in dbContext.Candidates.AsNoTracking()
+                on match.CandidateId equals candidate.Id
+            join analysis in dbContext.ResumeAnalyses.AsNoTracking()
+                on match.ResumeAnalysisId equals analysis.Id into analysisGroup
+            from analysis in analysisGroup.DefaultIfEmpty()
+            select new
+            {
+                Match = match,
+                Job = job,
+                Candidate = candidate,
+                Analysis = analysis
+            };
+
+        if (jobPostingId is not null)
+        {
+            query = query.Where(x => x.Match.JobPostingId == jobPostingId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim();
+            query = query.Where(x =>
+                x.Candidate.FullName.Contains(normalizedSearch) ||
+                x.Job.Title.Contains(normalizedSearch) ||
+                x.Match.MatchedSkills.Contains(normalizedSearch) ||
+                x.Match.MissingSkills.Contains(normalizedSearch) ||
+                x.Match.TopOverlappingKeywords.Contains(normalizedSearch) ||
+                (x.Analysis != null && x.Analysis.PredictedCategory.Contains(normalizedSearch)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.Match.MatchScore)
+            .ThenByDescending(x => x.Match.GeneratedUtc)
+            .Skip((validatedPageNumber - 1) * validatedPageSize)
+            .Take(validatedPageSize)
+            .Select(x => new MatchResultRowDto(
+                x.Match.Id,
+                x.Job.Id,
+                x.Job.Title,
+                x.Candidate.Id,
+                x.Candidate.FullName,
+                x.Match.MatchScore,
+                x.Match.MatchedSkills,
+                x.Match.MissingSkills,
+                x.Match.TopOverlappingKeywords,
+                x.Analysis != null ? x.Analysis.PredictedCategory : "N/A",
+                x.Analysis != null ? x.Analysis.ConfidenceScore : null,
+                x.Match.GeneratedUtc))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<MatchResultRowDto>(items, validatedPageNumber, validatedPageSize, totalCount);
+    }
+
     public async Task<IReadOnlyList<ModelVersionRowDto>> GetModelVersionsAsync(CancellationToken cancellationToken = default)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -119,5 +190,18 @@ internal sealed class DashboardReadService(IDbContextFactory<HireLensDbContext> 
                 x.TrainedUtc,
                 x.StoragePath))
             .ToListAsync(cancellationToken);
+    }
+
+    private static (int PageNumber, int PageSize) ValidatePaging(int pageNumber, int pageSize)
+    {
+        var validatedPageNumber = pageNumber < 1 ? 1 : pageNumber;
+        var validatedPageSize = pageSize switch
+        {
+            < 1 => 10,
+            > 100 => 100,
+            _ => pageSize
+        };
+
+        return (validatedPageNumber, validatedPageSize);
     }
 }

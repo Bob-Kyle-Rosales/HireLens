@@ -18,6 +18,17 @@ public sealed class JobsController(IJobPostingService jobPostingService) : Contr
         return Ok(jobs);
     }
 
+    [HttpGet("paged")]
+    public async Task<ActionResult<PagedResult<JobPostingDto>>> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var page = await jobPostingService.GetPagedAsync(pageNumber, pageSize, search, cancellationToken);
+        return Ok(page);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<JobPostingDto>> GetById(Guid id, CancellationToken cancellationToken)
     {

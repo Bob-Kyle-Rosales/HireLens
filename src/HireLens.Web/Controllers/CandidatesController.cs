@@ -33,6 +33,17 @@ public sealed class CandidatesController(ICandidateService candidateService) : C
         return Ok(candidates);
     }
 
+    [HttpGet("paged")]
+    public async Task<ActionResult<PagedResult<CandidateDto>>> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var page = await candidateService.GetPagedAsync(pageNumber, pageSize, search, cancellationToken);
+        return Ok(page);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CandidateDto>> GetById(Guid id, CancellationToken cancellationToken)
     {

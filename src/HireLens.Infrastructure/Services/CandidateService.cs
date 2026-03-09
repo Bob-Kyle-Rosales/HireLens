@@ -2,6 +2,7 @@ using HireLens.Application.DTOs;
 using HireLens.Application.Interfaces;
 using HireLens.Domain.Entities;
 using HireLens.Domain.Enums;
+using HireLens.Infrastructure.Helpers;
 using HireLens.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -35,9 +36,57 @@ internal sealed class CandidateService(
             .ToListAsync(cancellationToken);
 
         var latestApplications = await GetLatestApplicationInfoAsync(candidates.Select(x => x.Id).ToList(), cancellationToken);
+        var latestAnalyses = await GetLatestAnalysisInfoAsync(candidates.Select(x => x.Id).ToList(), cancellationToken);
         return candidates
-            .Select(candidate => MapToDto(candidate, latestApplications.TryGetValue(candidate.Id, out var info) ? info : null))
+            .Select(candidate => MapToDto(
+                candidate,
+                latestApplications.TryGetValue(candidate.Id, out var applicationInfo) ? applicationInfo : null,
+                latestAnalyses.TryGetValue(candidate.Id, out var analysisInfo) ? analysisInfo : null))
             .ToList();
+    }
+
+    public async Task<PagedResult<CandidateDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (validatedPageNumber, validatedPageSize) = ValidatePaging(pageNumber, pageSize);
+
+        var query = _dbContext.Candidates
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim();
+            query = query.Where(x =>
+                x.FullName.Contains(normalizedSearch) ||
+                x.Email.Contains(normalizedSearch) ||
+                x.ResumeFileName.Contains(normalizedSearch) ||
+                x.ResumeText.Contains(normalizedSearch));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var candidates = await query
+            .OrderByDescending(x => x.CreatedUtc)
+            .Skip((validatedPageNumber - 1) * validatedPageSize)
+            .Take(validatedPageSize)
+            .ToListAsync(cancellationToken);
+
+        var candidateIds = candidates.Select(x => x.Id).ToList();
+        var latestApplications = await GetLatestApplicationInfoAsync(candidateIds, cancellationToken);
+        var latestAnalyses = await GetLatestAnalysisInfoAsync(candidateIds, cancellationToken);
+
+        var items = candidates
+            .Select(candidate => MapToDto(
+                candidate,
+                latestApplications.TryGetValue(candidate.Id, out var applicationInfo) ? applicationInfo : null,
+                latestAnalyses.TryGetValue(candidate.Id, out var analysisInfo) ? analysisInfo : null))
+            .ToList();
+
+        return new PagedResult<CandidateDto>(items, validatedPageNumber, validatedPageSize, totalCount);
     }
 
     public async Task<CandidateDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -52,7 +101,12 @@ internal sealed class CandidateService(
         }
 
         var latestApplications = await GetLatestApplicationInfoAsync([candidate.Id], cancellationToken);
-        return MapToDto(candidate, latestApplications.TryGetValue(candidate.Id, out var info) ? info : null);
+        var latestAnalyses = await GetLatestAnalysisInfoAsync([candidate.Id], cancellationToken);
+
+        return MapToDto(
+            candidate,
+            latestApplications.TryGetValue(candidate.Id, out var applicationInfo) ? applicationInfo : null,
+            latestAnalyses.TryGetValue(candidate.Id, out var analysisInfo) ? analysisInfo : null);
     }
 
     public async Task<CandidateDto> UploadAsync(CandidateUploadRequest request, CancellationToken cancellationToken = default)
@@ -169,7 +223,12 @@ internal sealed class CandidateService(
             application.Status.ToString(),
             application.AppliedUtc);
 
-        return MapToDto(candidate, applicationInfo);
+        var latestAnalyses = await GetLatestAnalysisInfoAsync([candidate.Id], cancellationToken);
+
+        return MapToDto(
+            candidate,
+            applicationInfo,
+            latestAnalyses.TryGetValue(candidate.Id, out var analysisInfo) ? analysisInfo : null);
     }
 
     private async Task<Dictionary<Guid, CandidateApplicationInfo>> GetLatestApplicationInfoAsync(
@@ -221,7 +280,42 @@ internal sealed class CandidateService(
         return result;
     }
 
-    private static CandidateDto MapToDto(Candidate candidate, CandidateApplicationInfo? applicationInfo)
+    private async Task<Dictionary<Guid, CandidateAnalysisInfo>> GetLatestAnalysisInfoAsync(
+        IReadOnlyList<Guid> candidateIds,
+        CancellationToken cancellationToken)
+    {
+        if (candidateIds.Count == 0)
+        {
+            return [];
+        }
+
+        var latestAnalyses = await _dbContext.ResumeAnalyses
+            .AsNoTracking()
+            .Where(x => candidateIds.Contains(x.CandidateId))
+            .OrderByDescending(x => x.AnalyzedUtc)
+            .ToListAsync(cancellationToken);
+
+        if (latestAnalyses.Count == 0)
+        {
+            return [];
+        }
+
+        return latestAnalyses
+            .GroupBy(x => x.CandidateId)
+            .Select(x => x.First())
+            .ToDictionary(
+                x => x.CandidateId,
+                x => new CandidateAnalysisInfo(
+                    x.PredictedCategory,
+                    x.ConfidenceScore,
+                    TextProcessing.ParseSkillList(x.ExtractedSkills),
+                    x.AnalyzedUtc));
+    }
+
+    private static CandidateDto MapToDto(
+        Candidate candidate,
+        CandidateApplicationInfo? applicationInfo,
+        CandidateAnalysisInfo? analysisInfo)
     {
         return new CandidateDto(
             candidate.Id,
@@ -232,7 +326,24 @@ internal sealed class CandidateService(
             applicationInfo?.JobPostingId,
             applicationInfo?.JobTitle,
             applicationInfo?.Status,
-            applicationInfo?.AppliedUtc);
+            applicationInfo?.AppliedUtc,
+            analysisInfo?.PredictedCategory,
+            analysisInfo?.ConfidenceScore,
+            analysisInfo?.ExtractedSkills ?? [],
+            analysisInfo?.AnalyzedUtc);
+    }
+
+    private static (int PageNumber, int PageSize) ValidatePaging(int pageNumber, int pageSize)
+    {
+        var validatedPageNumber = pageNumber < 1 ? 1 : pageNumber;
+        var validatedPageSize = pageSize switch
+        {
+            < 1 => 10,
+            > 100 => 100,
+            _ => pageSize
+        };
+
+        return (validatedPageNumber, validatedPageSize);
     }
 
     private sealed record CandidateApplicationInfo(
@@ -240,4 +351,10 @@ internal sealed class CandidateService(
         string JobTitle,
         string Status,
         DateTime AppliedUtc);
+
+    private sealed record CandidateAnalysisInfo(
+        string PredictedCategory,
+        double ConfidenceScore,
+        IReadOnlyList<string> ExtractedSkills,
+        DateTime AnalyzedUtc);
 }

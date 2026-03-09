@@ -25,6 +25,40 @@ internal sealed class JobPostingService(
         return jobs.Select(MapToDto).ToList();
     }
 
+    public async Task<PagedResult<JobPostingDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (validatedPageNumber, validatedPageSize) = ValidatePaging(pageNumber, pageSize);
+
+        var query = _dbContext.JobPostings
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim();
+            query = query.Where(x =>
+                x.Title.Contains(normalizedSearch) ||
+                x.Description.Contains(normalizedSearch) ||
+                x.RequiredSkills.Contains(normalizedSearch) ||
+                x.OptionalSkills.Contains(normalizedSearch));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.UpdatedUtc)
+            .Skip((validatedPageNumber - 1) * validatedPageSize)
+            .Take(validatedPageSize)
+            .Select(x => MapToDto(x))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<JobPostingDto>(items, validatedPageNumber, validatedPageSize, totalCount);
+    }
+
     public async Task<JobPostingDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var job = await _dbContext.JobPostings
@@ -102,5 +136,18 @@ internal sealed class JobPostingService(
             entity.SeniorityLevel,
             entity.CreatedUtc,
             entity.UpdatedUtc);
+    }
+
+    private static (int PageNumber, int PageSize) ValidatePaging(int pageNumber, int pageSize)
+    {
+        var validatedPageNumber = pageNumber < 1 ? 1 : pageNumber;
+        var validatedPageSize = pageSize switch
+        {
+            < 1 => 10,
+            > 100 => 100,
+            _ => pageSize
+        };
+
+        return (validatedPageNumber, validatedPageSize);
     }
 }

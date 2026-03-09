@@ -26,6 +26,17 @@ public sealed class MatchesController(IMatchingService matchingService) : Contro
         return Ok(rows);
     }
 
+    [HttpGet("job/{jobPostingId:guid}/paged")]
+    public async Task<ActionResult<PagedResult<MatchResultDto>>> GetByJobPostingIdPaged(
+        Guid jobPostingId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var page = await matchingService.GetByJobPostingIdPagedAsync(jobPostingId, pageNumber, pageSize, cancellationToken);
+        return Ok(page);
+    }
+
     [HttpPost("run")]
     public async Task<ActionResult<IReadOnlyList<MatchResultDto>>> RunForJob(
         [FromBody] MatchCandidatesRequest request,

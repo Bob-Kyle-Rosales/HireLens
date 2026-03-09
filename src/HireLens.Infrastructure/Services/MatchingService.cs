@@ -66,6 +66,34 @@ internal sealed partial class MatchingService(
         return rows.Select(MapToDto).ToList();
     }
 
+    public async Task<PagedResult<MatchResultDto>> GetByJobPostingIdPagedAsync(
+        Guid jobPostingId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var (validatedPageNumber, validatedPageSize) = ValidatePaging(pageNumber, pageSize);
+
+        var query = _dbContext.MatchResults
+            .AsNoTracking()
+            .Where(x => x.JobPostingId == jobPostingId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var rows = await query
+            .OrderByDescending(x => x.MatchScore)
+            .ThenByDescending(x => x.GeneratedUtc)
+            .Skip((validatedPageNumber - 1) * validatedPageSize)
+            .Take(validatedPageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<MatchResultDto>(
+            rows.Select(MapToDto).ToList(),
+            validatedPageNumber,
+            validatedPageSize,
+            totalCount);
+    }
+
     public async Task<IReadOnlyList<MatchResultDto>> MatchForJobAsync(
         MatchCandidatesRequest request,
         CancellationToken cancellationToken = default)
@@ -304,4 +332,17 @@ internal sealed partial class MatchingService(
 
     [GeneratedRegex(@"[a-z0-9\+#\.-]+", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex TokenRegex();
+
+    private static (int PageNumber, int PageSize) ValidatePaging(int pageNumber, int pageSize)
+    {
+        var validatedPageNumber = pageNumber < 1 ? 1 : pageNumber;
+        var validatedPageSize = pageSize switch
+        {
+            < 1 => 10,
+            > 100 => 100,
+            _ => pageSize
+        };
+
+        return (validatedPageNumber, validatedPageSize);
+    }
 }
