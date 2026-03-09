@@ -15,7 +15,7 @@
             </MudText>
         </div>
         <MudStack Row="true" Spacing="1">
-            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_rows.Count ranked rows</MudChip>
+            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_totalCount ranked rows</MudChip>
             <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Info">
                 @(_selectedJobId is null ? "All jobs" : "Filtered")
             </MudChip>
@@ -26,7 +26,7 @@
 <MudGrid>
     <MudItem xs="12" lg="8">
         <MudPaper Class="pa-4 hl-panel">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3 hl-toolbar-wrap">
                 <MudSelect T="string"
                            Label="Job Filter"
                            Variant="Variant.Outlined"
@@ -38,6 +38,20 @@
                         <MudSelectItem T="string" Value="@job.Id.ToString()">@job.Title</MudSelectItem>
                     }
                 </MudSelect>
+                <MudTextField T="string"
+                              Variant="Variant.Outlined"
+                              Style="flex: 1"
+                              Immediate="true"
+                              Placeholder="Search candidate, category, or keywords..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Value="@_searchText"
+                              ValueChanged="OnSearchChanged" />
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="@(_loading || !HasActiveFilters)"
+                           OnClick="ClearFiltersAsync">
+                    Clear
+                </MudButton>
                 <MudSpacer />
                 <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">Refresh</MudButton>
             </MudStack>
@@ -76,9 +90,31 @@
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <MudText Typo="Typo.body2">No match results available yet.</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(HasActiveFilters ? "No match rows found for current filters." : "No match results available yet.")
+                    </MudText>
                 </NoRecordsContent>
             </MudTable>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-3">
+                <MudText Typo="Typo.caption" Class="hl-muted">
+                    Showing page @_pageNumber of @TotalPages (@_totalCount total matches)
+                </MudText>
+                <MudStack Row="true" Spacing="1">
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Disabled="@(_loading || _pageNumber <= 1)"
+                               OnClick="PreviousPageAsync">
+                        Previous
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Disabled="@(_loading || _pageNumber >= TotalPages)"
+                               OnClick="NextPageAsync">
+                        Next
+                    </MudButton>
+                </MudStack>
+            </MudStack>
         </MudPaper>
     </MudItem>
 
@@ -129,13 +165,21 @@
 
 @code {
     private const string AllJobsFilterValue = "__all__";
+    private const int DefaultPageSize = 10;
 
     private List<JobLookupDto> _jobs = [];
     private List<MatchResultRowDto> _rows = [];
     private MatchResultRowDto? _selected;
     private Guid? _selectedJobId;
     private string _selectedJobFilterValue = AllJobsFilterValue;
+    private string _searchText = string.Empty;
     private bool _loading;
+    private int _pageNumber = 1;
+    private int _totalCount;
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)DefaultPageSize));
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(_searchText) || !string.Equals(_selectedJobFilterValue, AllJobsFilterValue, StringComparison.Ordinal);
 
     protected override async Task OnInitializedAsync()
     {
@@ -160,8 +204,18 @@
         _loading = true;
         try
         {
-            _rows = (await DashboardReadService.GetMatchResultsAsync(_selectedJobId)).ToList();
-            _selected = _rows.FirstOrDefault();
+            var page = await DashboardReadService.GetMatchResultsPagedAsync(
+                _selectedJobId,
+                _pageNumber,
+                DefaultPageSize,
+                _searchText);
+
+            _rows = page.Items.ToList();
+            _totalCount = page.TotalCount;
+
+            _selected = _selected is null
+                ? _rows.FirstOrDefault()
+                : _rows.FirstOrDefault(x => x.Id == _selected.Id) ?? _rows.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -171,6 +225,27 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _searchText = value;
+        _pageNumber = 1;
+        await ReloadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        if (!HasActiveFilters)
+        {
+            return;
+        }
+
+        _searchText = string.Empty;
+        _selectedJobId = null;
+        _selectedJobFilterValue = AllJobsFilterValue;
+        _pageNumber = 1;
+        await ReloadAsync();
     }
 
     private async Task OnJobFilterChanged(string value)
@@ -191,6 +266,29 @@
             _selectedJobFilterValue = AllJobsFilterValue;
         }
 
+        _pageNumber = 1;
+        await ReloadAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (_pageNumber <= 1)
+        {
+            return;
+        }
+
+        _pageNumber--;
+        await ReloadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_pageNumber >= TotalPages)
+        {
+            return;
+        }
+
+        _pageNumber++;
         await ReloadAsync();
     }
 

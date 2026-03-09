@@ -73,6 +73,12 @@ h1:focus {
     color: #bfdbfe !important;
 }
 
+.hl-inline-form {
+    margin: 0 0 0 0.5rem;
+    display: inline-flex;
+    align-items: center;
+}
+
 .hl-drawer {
     border-right: 1px solid var(--hl-stroke);
     background: rgba(255, 255, 255, 0.96);
@@ -122,6 +128,10 @@ h1:focus {
 
 .hl-panel-title {
     font-weight: 700;
+}
+
+.hl-toolbar-wrap {
+    flex-wrap: wrap;
 }
 
 .hl-nav-menu .mud-nav-link {
@@ -218,6 +228,60 @@ h1:focus {
     top: 80px;
 }
 
+.hl-auth-panel {
+    max-width: 540px;
+    margin: 0 auto;
+}
+
+.hl-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.hl-auth-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #304152;
+}
+
+.hl-auth-input {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.2);
+    padding: 0.72rem 0.78rem;
+    font: inherit;
+    color: #1f2937;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.hl-auth-input:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.3);
+    border-color: #2563eb;
+}
+
+.hl-auth-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    color: #304152;
+}
+
+.hl-auth-button {
+    border: none;
+    border-radius: 10px;
+    padding: 0.72rem 0.95rem;
+    font-weight: 700;
+    color: #f8fafc;
+    background: linear-gradient(100deg, #0f766e, #2563eb);
+    cursor: pointer;
+}
+
+.hl-auth-button:hover {
+    filter: brightness(1.03);
+}
+
 @keyframes hl-fade-up {
     from {
         opacity: 0;
@@ -271,5 +335,10 @@ h1:focus {
 
     .hl-explain-panel {
         position: static;
+    }
+
+    .hl-toolbar-wrap .mud-input-control,
+    .hl-toolbar-wrap .mud-button-root {
+        width: 100%;
     }
 }

@@ -21,7 +21,7 @@
             </MudText>
         </div>
         <MudStack Row="true" Spacing="1">
-            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_candidates.Count candidates</MudChip>
+            <MudChip Class="hl-metric-chip" Variant="Variant.Filled" Color="Color.Primary">@_totalCount candidates</MudChip>
             <MudChip Class="hl-metric-chip" Variant="Variant.Outlined" Color="Color.Info">Resume intake</MudChip>
         </MudStack>
     </MudStack>
@@ -83,23 +83,35 @@
                     Refresh
                 </MudButton>
             </MudStack>
-            <MudTextField T="string"
-                          Class="my-3"
-                          Variant="Variant.Outlined"
-                          Immediate="true"
-                          Placeholder="Search by name, email, or file..."
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          @bind-Value="_searchText" />
+            <MudStack Row="true" Spacing="1" Class="my-3 hl-toolbar-wrap">
+                <MudTextField T="string"
+                              Style="flex: 1"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Placeholder="Search by name, email, file, or category..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Value="@_searchText"
+                              ValueChanged="OnSearchChanged" />
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="@(_loading || !HasActiveFilters)"
+                           OnClick="ClearFiltersAsync">
+                    Clear
+                </MudButton>
+            </MudStack>
 
-            <MudTable Items="@FilteredCandidates" Hover="true" Dense="true" Loading="@_loading" Class="hl-data-table">
+            <MudTable Items="_candidates" Hover="true" Dense="true" Loading="@_loading" Class="hl-data-table">
                 <HeaderContent>
                     <MudTh>Name</MudTh>
                     <MudTh>Email</MudTh>
                     <MudTh>Applied Job</MudTh>
                     <MudTh>Status</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh>Confidence</MudTh>
+                    <MudTh>Skills</MudTh>
                     <MudTh>Resume</MudTh>
                     <MudTh>Uploaded</MudTh>
+                    <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.FullName</MudTd>
@@ -110,19 +122,88 @@
                             @(context.LatestApplicationStatus ?? "Unassigned")
                         </MudChip>
                     </MudTd>
+                    <MudTd DataLabel="Category">@(context.LatestPredictedCategory ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Confidence">@FormatConfidence(context.LatestConfidenceScore)</MudTd>
+                    <MudTd DataLabel="Skills">
+                        <MudText Typo="Typo.caption">@FormatSkillsPreview(context.LatestExtractedSkills)</MudText>
+                    </MudTd>
                     <MudTd DataLabel="Resume">@context.ResumeFileName</MudTd>
                     <MudTd DataLabel="Uploaded">@context.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd DataLabel="AI">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   OnClick="@(() => SelectCandidate(context))">
+                            Details
+                        </MudButton>
+                    </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <MudText Typo="Typo.body2">No candidates uploaded yet.</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(HasActiveFilters ? "No candidates match your current search." : "No candidates uploaded yet.")
+                    </MudText>
                 </NoRecordsContent>
             </MudTable>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-3">
+                <MudText Typo="Typo.caption" Class="hl-muted">
+                    Showing page @_pageNumber of @TotalPages (@_totalCount total candidates)
+                </MudText>
+                <MudStack Row="true" Spacing="1">
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Disabled="@(_loading || _pageNumber <= 1)"
+                               OnClick="PreviousPageAsync">
+                        Previous
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Disabled="@(_loading || _pageNumber >= TotalPages)"
+                               OnClick="NextPageAsync">
+                        Next
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider Class="my-3" />
+
+            @if (_selectedCandidate is null)
+            {
+                <MudText Typo="Typo.body2" Class="hl-muted">
+                    Select a candidate row to inspect AI outputs (category, confidence, extracted skills).
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle1" Class="hl-panel-title">AI Details: @_selectedCandidate.FullName</MudText>
+                <MudText Typo="Typo.caption" Class="hl-muted">
+                    Last analyzed: @FormatAnalyzedUtc(_selectedCandidate.LatestAnalyzedUtc)
+                </MudText>
+
+                <MudStack Row="true" Spacing="1" Class="mt-2">
+                    <MudChip Variant="Variant.Outlined" Color="Color.Info">
+                        Category: @(_selectedCandidate.LatestPredictedCategory ?? "N/A")
+                    </MudChip>
+                    <MudChip Variant="Variant.Outlined" Color="@GetConfidenceColor(_selectedCandidate.LatestConfidenceScore)">
+                        Confidence: @FormatConfidence(_selectedCandidate.LatestConfidenceScore)
+                    </MudChip>
+                </MudStack>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-3">Extracted Skills</MudText>
+                <MudChipSet Class="mt-1">
+                    @foreach (var skill in GetSkillsOrPlaceholder(_selectedCandidate.LatestExtractedSkills))
+                    {
+                        <MudChip Variant="Variant.Outlined" Color="Color.Success">@skill</MudChip>
+                    }
+                </MudChipSet>
+            }
         </MudPaper>
     </MudItem>
 </MudGrid>
 
 @code {
     private const long MaxResumeSizeBytes = 10 * 1024 * 1024;
+    private const int DefaultPageSize = 10;
 
     [SupplyParameterFromQuery(Name = "jobId")]
     public Guid? JobId { get; set; }
@@ -130,16 +211,17 @@
     private readonly UploadFormModel _upload = new();
     private List<CandidateDto> _candidates = [];
     private List<JobPostingDto> _jobs = [];
+    private CandidateDto? _selectedCandidate;
     private IBrowserFile? _selectedFile;
     private string _selectedFileName = string.Empty;
     private bool _loading;
     private bool _uploading;
     private string _searchText = string.Empty;
+    private int _pageNumber = 1;
+    private int _totalCount;
 
-    private IReadOnlyList<CandidateDto> FilteredCandidates =>
-        string.IsNullOrWhiteSpace(_searchText)
-            ? _candidates
-            : _candidates.Where(IsMatch).ToList();
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)DefaultPageSize));
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_searchText);
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,7 +262,12 @@
         _loading = true;
         try
         {
-            _candidates = (await CandidateService.GetAllAsync()).ToList();
+            var page = await CandidateService.GetPagedAsync(_pageNumber, DefaultPageSize, _searchText);
+            _candidates = page.Items.ToList();
+            _totalCount = page.TotalCount;
+            _selectedCandidate = _selectedCandidate is null
+                ? _candidates.FirstOrDefault()
+                : _candidates.FirstOrDefault(x => x.Id == _selectedCandidate.Id) ?? _candidates.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -190,6 +277,47 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _searchText = value;
+        _pageNumber = 1;
+        await ReloadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        if (!HasActiveFilters)
+        {
+            return;
+        }
+
+        _searchText = string.Empty;
+        _pageNumber = 1;
+        await ReloadAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (_pageNumber <= 1)
+        {
+            return;
+        }
+
+        _pageNumber--;
+        await ReloadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_pageNumber >= TotalPages)
+        {
+            return;
+        }
+
+        _pageNumber++;
+        await ReloadAsync();
     }
 
     private void HandleFileSelected(InputFileChangeEventArgs args)
@@ -256,6 +384,7 @@
             await CandidateService.UploadAsync(request);
             Snackbar.Add("Candidate uploaded.", Severity.Success);
             ResetUploadForm();
+            _pageNumber = 1;
             await ReloadAsync();
         }
         catch (Exception ex)
@@ -277,19 +406,59 @@
         _selectedFileName = string.Empty;
     }
 
-    private bool IsMatch(CandidateDto item)
+    private void SelectCandidate(CandidateDto candidate)
     {
-        return Contains(item.FullName)
-               || Contains(item.Email)
-               || Contains(item.ResumeFileName)
-               || Contains(item.LatestAppliedJobTitle)
-               || Contains(item.LatestApplicationStatus);
+        _selectedCandidate = candidate;
     }
 
-    private bool Contains(string? value)
+    private static string FormatConfidence(double? confidence)
     {
-        return !string.IsNullOrWhiteSpace(value)
-               && value.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+        return confidence is null ? "N/A" : confidence.Value.ToString("P0");
+    }
+
+    private static Color GetConfidenceColor(double? confidence)
+    {
+        if (confidence is null)
+        {
+            return Color.Default;
+        }
+
+        if (confidence.Value >= 0.8)
+        {
+            return Color.Success;
+        }
+
+        if (confidence.Value >= 0.6)
+        {
+            return Color.Warning;
+        }
+
+        return Color.Error;
+    }
+
+    private static string FormatSkillsPreview(IReadOnlyList<string> skills)
+    {
+        if (skills.Count == 0)
+        {
+            return "No extracted skills";
+        }
+
+        var preview = skills.Take(3).ToList();
+        return preview.Count == skills.Count
+            ? string.Join(", ", preview)
+            : $"{string.Join(", ", preview)} (+{skills.Count - preview.Count} more)";
+    }
+
+    private static string FormatAnalyzedUtc(DateTime? analyzedUtc)
+    {
+        return analyzedUtc is null
+            ? "No analysis data"
+            : analyzedUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    }
+
+    private static IReadOnlyList<string> GetSkillsOrPlaceholder(IReadOnlyList<string> skills)
+    {
+        return skills.Count == 0 ? ["None"] : skills;
     }
 
     private static Color GetApplicationStatusColor(string? status)
