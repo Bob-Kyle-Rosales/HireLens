@@ -1,0 +1,42 @@
+@page "/access-denied"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager NavigationManager
+
+<PageTitle>Access Denied</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-6 hl-panel hl-auth-panel">
+        <MudText Typo="Typo.h5" Class="hl-page-title">Access Denied</MudText>
+        <MudText Typo="Typo.body2" Class="hl-page-subtitle">
+            Your account is authenticated but does not have permission for this route.
+        </MudText>
+
+        @if (!string.IsNullOrWhiteSpace(_returnUrl))
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-3">
+                Requested URL: @_returnUrl
+            </MudAlert>
+        }
+
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
+                Go to Dashboard
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" Href="/login">
+                Switch Account
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string _returnUrl = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        _returnUrl = query.TryGetValue("returnUrl", out var value) ? value.ToString() : string.Empty;
+    }
+}

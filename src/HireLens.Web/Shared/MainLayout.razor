@@ -14,6 +14,27 @@
         <MudChip Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small" Class="hl-status-chip">
             Preview
         </MudChip>
+        <AuthorizeView>
+            <Authorized>
+                <form method="post" action="/auth/logout" class="hl-inline-form">
+                    <input type="hidden" name="ReturnUrl" value="/" />
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Inherit"
+                               Size="Size.Small"
+                               ButtonType="ButtonType.Submit">
+                        Sign Out
+                    </MudButton>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Inherit"
+                           Size="Size.Small"
+                           Href="/login">
+                    Sign In
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
     </MudAppBar>
 
     <MudDrawer Open="@_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1" Class="hl-drawer">

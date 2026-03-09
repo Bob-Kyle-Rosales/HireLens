@@ -116,6 +116,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<HireLensDbContext>()
+    .AddSignInManager()
     .AddApiEndpoints();
 
 var app = builder.Build();

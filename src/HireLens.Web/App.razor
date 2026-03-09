@@ -10,18 +10,14 @@
                     </MudContainer>
                 </Authorizing>
                 <NotAuthorized Context="authState">
-                    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-                        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
-                            @if (authState.User.Identity?.IsAuthenticated ?? false)
-                            {
-                                <span>Your account does not have permission to view this page.</span>
-                            }
-                            else
-                            {
-                                <span>Authentication required. Sign in via the auth endpoint to continue.</span>
-                            }
-                        </MudAlert>
-                    </MudContainer>
+                    @if (authState.User.Identity?.IsAuthenticated ?? false)
+                    {
+                        <RedirectToAccessDenied />
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
                 </NotAuthorized>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />

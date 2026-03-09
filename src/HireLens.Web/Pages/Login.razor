@@ -1,0 +1,106 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager NavigationManager
+
+<PageTitle>Sign In</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-6 hl-panel hl-auth-panel">
+        <MudText Typo="Typo.h5" Class="hl-page-title">Sign In</MudText>
+        <MudText Typo="Typo.body2" Class="hl-page-subtitle mb-4">
+            Access your recruiting workspace.
+        </MudText>
+
+        @if (_loggedOut)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-3">
+                You have been signed out.
+            </MudAlert>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-3">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <form method="post" action="/auth/login" class="hl-auth-form">
+            <label class="hl-auth-label" for="hl-login-email">Email</label>
+            <input id="hl-login-email"
+                   class="hl-auth-input"
+                   type="email"
+                   name="Email"
+                   required
+                   autocomplete="username"
+                   value="@_email" />
+
+            <label class="hl-auth-label mt-3" for="hl-login-password">Password</label>
+            <input id="hl-login-password"
+                   class="hl-auth-input"
+                   type="password"
+                   name="Password"
+                   required
+                   autocomplete="current-password" />
+
+            <label class="hl-auth-checkbox mt-3">
+                <input type="checkbox" name="RememberMe" value="true" />
+                Keep me signed in
+            </label>
+
+            <input type="hidden" name="ReturnUrl" value="@_returnUrl" />
+
+            <button type="submit" class="hl-auth-button mt-4">Sign In</button>
+        </form>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private string _email = string.Empty;
+    private string _returnUrl = "/";
+    private string _errorMessage = string.Empty;
+    private bool _loggedOut;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is not null)
+        {
+            var authState = await AuthenticationStateTask;
+            if (authState.User.Identity?.IsAuthenticated ?? false)
+            {
+                NavigationManager.NavigateTo("/", forceLoad: true);
+                return;
+            }
+        }
+
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        _email = query.TryGetValue("email", out var email) ? email.ToString() : string.Empty;
+        _errorMessage = query.TryGetValue("error", out var error) ? error.ToString() : string.Empty;
+        _loggedOut = query.TryGetValue("loggedOut", out var loggedOut) && string.Equals(loggedOut.ToString(), "1", StringComparison.Ordinal);
+
+        var requestedReturnUrl = query.TryGetValue("returnUrl", out var returnUrl)
+            ? returnUrl.ToString()
+            : "/";
+
+        _returnUrl = GetSafeLocalReturnUrl(requestedReturnUrl);
+    }
+
+    private static string GetSafeLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return "/";
+        }
+
+        return returnUrl.StartsWith("/", StringComparison.Ordinal) && !returnUrl.StartsWith("//", StringComparison.Ordinal)
+            ? returnUrl
+            : "/";
+    }
+}
