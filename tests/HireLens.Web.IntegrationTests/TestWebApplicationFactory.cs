@@ -36,8 +36,14 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<HireLensDbContext>>();
             services.RemoveAll<HireLensDbContext>();
+            services.RemoveAll<IDbContextFactory<HireLensDbContext>>();
 
-            services.AddDbContext<HireLensDbContext>(options =>
+            services.AddDbContext<HireLensDbContext>(
+                options => options.UseInMemoryDatabase(_databaseName),
+                contextLifetime: ServiceLifetime.Scoped,
+                optionsLifetime: ServiceLifetime.Singleton);
+
+            services.AddDbContextFactory<HireLensDbContext>(options =>
             {
                 options.UseInMemoryDatabase(_databaseName);
             });
