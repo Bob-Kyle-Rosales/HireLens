@@ -136,8 +136,11 @@ internal sealed partial class MatchingService(
         var optionalSkills = TextProcessing.ParseSkillList(job.OptionalSkills);
         var jobDocument = $"{job.Title} {job.Description} {job.RequiredSkills} {job.OptionalSkills}";
         var jobKeywords = TextProcessing.TokenizeKeywords(jobDocument);
+        var candidateProfiles = candidates.ToDictionary(
+            x => x.Id,
+            x => ResumeScoringTextBuilder.Build(x.ResumeText));
 
-        var documents = candidates.Select(x => x.ResumeText).Append(jobDocument).ToList();
+        var documents = candidateProfiles.Values.Select(x => x.SimilarityText).Append(jobDocument).ToList();
         var idf = BuildInverseDocumentFrequencies(documents);
         var jobVector = BuildTfIdfVector(jobDocument, idf);
         var generatedUtc = DateTime.UtcNow;
@@ -145,10 +148,11 @@ internal sealed partial class MatchingService(
         var results = new List<MatchResult>(capacity: candidates.Count);
         foreach (var candidate in candidates)
         {
-            var resumeVector = BuildTfIdfVector(candidate.ResumeText, idf);
+            var profile = candidateProfiles[candidate.Id];
+            var resumeVector = BuildTfIdfVector(profile.SimilarityText, idf);
             var cosineSimilarity = CosineSimilarity(jobVector, resumeVector);
 
-            var normalizedResume = TextProcessing.NormalizeText(candidate.ResumeText);
+            var normalizedResume = TextProcessing.NormalizeText(profile.SkillEvidenceText);
             var matchedRequired = requiredSkills.Where(skill => ContainsSkill(normalizedResume, skill)).ToList();
             var missingRequired = requiredSkills.Except(matchedRequired, StringComparer.OrdinalIgnoreCase).ToList();
             var matchedOptional = optionalSkills.Where(skill => ContainsSkill(normalizedResume, skill)).ToList();
@@ -157,7 +161,7 @@ internal sealed partial class MatchingService(
             var optionalCoverage = optionalSkills.Count == 0 ? 0d : (double)matchedOptional.Count / optionalSkills.Count;
             var missingRatio = requiredSkills.Count == 0 ? 0d : (double)missingRequired.Count / requiredSkills.Count;
 
-            var resumeKeywords = TextProcessing.TokenizeKeywords(candidate.ResumeText);
+            var resumeKeywords = TextProcessing.TokenizeKeywords(profile.SimilarityText);
             var overlappingKeywords = jobKeywords
                 .Intersect(resumeKeywords, StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(keyword => idf.TryGetValue(keyword, out var weight) ? weight : 0d)

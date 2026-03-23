@@ -77,6 +77,85 @@ public sealed class MatchingRulesIntegrationTests(TestWebApplicationFactory fact
         Assert.Contains(weakMissingSkills, x => string.Equals(x, "ASP.NET Core", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Keywords_In_Interests_Section_Do_Not_Count_As_Core_Match_Evidence()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Roles", "Admin,Recruiter");
+
+        var createJobRequest = new
+        {
+            title = "Backend Engineer",
+            description = "Build APIs with ASP.NET Core and C#.",
+            requiredSkills = new[] { "C#", "ASP.NET Core" },
+            optionalSkills = new[] { "Redis" },
+            seniorityLevel = 2
+        };
+
+        var createJobResponse = await client.PostAsJsonAsync("/api/jobs", createJobRequest);
+        createJobResponse.EnsureSuccessStatusCode();
+        var createdJob = await createJobResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var jobId = createdJob.GetProperty("id").GetGuid();
+
+        var focusedCandidateId = await UploadCandidateAsync(
+            client,
+            "Focused Candidate",
+            "focused.candidate@example.com",
+            jobId,
+            """
+            SKILLS
+            C#, ASP.NET Core, SQL Server
+
+            EXPERIENCE
+            Built backend APIs and recruiter tools using ASP.NET Core and C#.
+            """);
+
+        var noisyCandidateId = await UploadCandidateAsync(
+            client,
+            "Noisy Candidate",
+            "noisy.candidate@example.com",
+            jobId,
+            """
+            SUMMARY
+            Operations assistant focused on reports and admin coordination.
+
+            EXPERIENCE
+            Managed spreadsheets, schedules, and office operations.
+
+            INTERESTS
+            Learning C#, ASP.NET Core, Redis, microservices, and backend APIs.
+            """);
+
+        var matchRequest = new
+        {
+            jobPostingId = jobId,
+            candidateIds = new[] { focusedCandidateId, noisyCandidateId }
+        };
+
+        var matchesResponse = await client.PostAsJsonAsync("/api/matches/run", matchRequest);
+        matchesResponse.EnsureSuccessStatusCode();
+        var matches = await matchesResponse.Content.ReadFromJsonAsync<JsonElement[]>();
+
+        Assert.NotNull(matches);
+        Assert.Equal(2, matches!.Length);
+
+        var focused = matches.First(x => x.GetProperty("candidateId").GetGuid() == focusedCandidateId);
+        var noisy = matches.First(x => x.GetProperty("candidateId").GetGuid() == noisyCandidateId);
+
+        Assert.True(
+            focused.GetProperty("matchScore").GetDouble() > noisy.GetProperty("matchScore").GetDouble(),
+            "Expected focused experience/skills to outrank noisy keyword mentions.");
+
+        var noisyMissingSkills = noisy.GetProperty("missingSkills")
+            .EnumerateArray()
+            .Select(x => x.GetString())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+
+        Assert.Contains(noisyMissingSkills, x => string.Equals(x, "C#", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(noisyMissingSkills, x => string.Equals(x, "ASP.NET Core", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static async Task<Guid> UploadCandidateAsync(
         HttpClient client,
         string fullName,
